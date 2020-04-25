@@ -5,8 +5,8 @@
 // 
 //
 //
-// This drives servo motors 90 degrees on PB6, PB7 when 
-// ultrasonic sensor sense object around 4.5cm away.
+// This drives servo motors 90 degrees to left on PWM PB6, PB7 when 
+// ultrasonic sensor senses object around 4.5cm away.
 //***********************************************************
 
 #include <stdint.h>
