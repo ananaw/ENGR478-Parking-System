@@ -22,7 +22,7 @@
 #include "driverlib/interrupt.h" 			// manually added
 #include "inc/tm4c123gh6pm.h"					// manually added
 //***********************************************************
-volatile uin32_t cars_count;
+volatile uint32_t cars_count;
 volatile uint32_t count;
 //volatile uint32_t duration;
 //volatile uint32_t distance;
