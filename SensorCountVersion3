@@ -1,0 +1,346 @@
+//***********************************************************
+// Hardware PWM proof of concept using
+// the Tiva C Launchpad
+//
+// 
+//
+//
+// This drives servo motors 90 degrees to left on PWM PB6, PB7 when 
+// ultrasonic sensor senses object around 4.5cm away.
+//***********************************************************
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_gpio.h"
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
+#include "inc/hw_timer.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/gpio.h"
+#include "driverlib/pwm.h"
+#include "driverlib/timer.h"					// manually added
+#include "driverlib/interrupt.h" 			// manually added
+#include "inc/tm4c123gh6pm.h"					// manually added
+//***********************************************************
+volatile bool trigok0 = 1;			// trig condition for sensor 1
+volatile bool trigok1 = 1;			// trig condition for sensor 2
+volatile bool trigok2 = 1;			// trig condition for sensor 3
+volatile bool trigok3 = 1;			// trig condition for sensor 4
+volatile bool trigok4 = 1;			// trig condition for sensor 5
+volatile uint32_t cars_count;
+volatile uint32_t count;
+volatile float duration0;
+volatile float distance0;
+volatile float duration1;
+volatile float distance1;
+volatile float duration2;
+volatile float distance2;
+volatile float duration3;
+volatile float distance3;
+volatile float duration4;
+volatile float distance4;
+
+void PortFunctionInit(void)
+{
+	// Enable clock for Port F peripheral
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+	//
+	// Enable pin PF3 for GPIOOutput (green) Trig
+	//
+	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_3|GPIO_PIN_1);
+
+	//
+	// Enable pin PF2 for GPIOInput (blue) Echo
+	//
+	GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_2|GPIO_PIN_4);
+	
+	// Set output 2mA current strength, push-pull pin *STD, and weak pull down *WPD.
+	GPIOPadConfigSet(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
+	
+	//Enable pull-up on PF4 
+	//GPIO_PORTF_PUR_R |= 0x10; 
+	
+	// Enable clock for Port B peripheral
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+	//
+	// Enable pin PB0,2,4,6 for GPIOOutput Trig
+	//
+	GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, GPIO_PIN_0|GPIO_PIN_2|GPIO_PIN_4|GPIO_PIN_6);
+
+	//
+	// Enable pin PB1,3,5,7 for GPIOInput  Echo
+	//
+	GPIOPinTypeGPIOInput(GPIO_PORTB_BASE, GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7);
+	
+	// Set output 2mA current strength, push-pull pin *STD, and weak pull down *WPD.
+	GPIOPadConfigSet(GPIO_PORTB_BASE, GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
+}
+
+void
+ConfigurePWM(uint32_t period, uint32_t duty)
+{
+    //Configure PWM Clock divide system clock by 32
+    SysCtlPWMClockSet(SYSCTL_PWMDIV_32);
+
+    // Enable E peripheral used by this program.
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM0);  //Tiva Launchpad has two modules (0 and 1). Module 0 covers the E peripheral
+
+    //Configure PE4,PE5 Pins as PWM
+    GPIOPinConfigure(GPIO_PE4_M0PWM4);
+    GPIOPinConfigure(GPIO_PE5_M0PWM5);
+    GPIOPinTypePWM(GPIO_PORTE_BASE, GPIO_PIN_4|GPIO_PIN_5);
+
+    //Configure PWM Options
+    //PWM_GEN_2 Covers M0PWM4 and M0PWM5 for PE4,5, with count down mode, no comparator update synchronization mode
+    PWMGenConfigure(PWM0_BASE, PWM_GEN_2, PWM_GEN_MODE_DOWN|PWM_GEN_MODE_NO_SYNC); 
+
+    //Set the Period (expressed in clock ticks)
+    PWMGenPeriodSet(PWM0_BASE, PWM_GEN_2, period);
+
+    //Set PWM duty for M0PWM4 and M0PWM5
+    PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, duty);
+    PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, duty);
+
+    // Enable the PWM generator
+    PWMGenEnable(PWM0_BASE, PWM_GEN_2);
+
+		// Enable PWM Output pins 4 & 5: M0PWM4 and M0PWM5
+    PWMOutputState(PWM0_BASE, PWM_OUT_4_BIT|PWM_OUT_5_BIT, true);		
+}
+
+void Timers_Init()		//unsigned long reload
+{
+	//Timer 0A interrupt, 0B count
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);			// enable peripheral clock for Timer0A
+	TimerDisable(TIMER0_BASE, TIMER_A);								// disable timer during setup
+	TimerConfigure(TIMER0_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
+	//TimerLoadSet(TIMER0_BASE, TIMER_A, reload-1);			// reload value of 60ms
+	IntPrioritySet(INT_TIMER0A, 0x20);								// Set priority as 1
+	IntEnable(INT_TIMER0A);														// Enable interrupt 35 in NVIC
+	TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
+	TimerEnable(TIMER0_BASE, TIMER_B);
+	
+	// Timer 1A interrupt,1B count
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);			// enable peripheral clock for Timer1A
+	TimerDisable(TIMER1_BASE, TIMER_A);								// disable timer during setup
+	TimerConfigure(TIMER1_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
+	IntPrioritySet(INT_TIMER1A, 0x20);								// Set priority as 1
+	IntEnable(INT_TIMER1A);														// Enable interrupt  in NVIC
+	TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
+	TimerEnable(TIMER1_BASE, TIMER_B);								// Enable Timer1A
+
+	// Timer 2A interrupt,2B count
+//	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);			// enable peripheral clock for Timer2A
+//	TimerDisable(TIMER2_BASE, TIMER_A);								// disable timer during setup
+//	TimerConfigure(TIMER2_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
+//	IntPrioritySet(INT_TIMER2A, 0x20);								// Set priority as 1
+//	IntEnable(INT_TIMER2A);														// Enable interrupt 35 in NVIC
+//	TimerIntEnable(TIMER2_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
+//	TimerEnable(TIMER2_BASE, TIMER_A);								// Enable Timer2A
+	
+}
+
+void InterruptF_Init(void)
+{
+	IntEnable(INT_GPIOF);								                          // Enable interrupt 30 in NVIC, Code: NVIC_EN0_R |= 0x40000000;
+	IntPrioritySet(INT_GPIOF, 0x00);		                          // Set interrupt priority 0 bits 23-21:010, Code: NVIC_PRI7_R &= ~0x00E00000
+	GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_1|GPIO_INT_PIN_2);		//GPIO_PORTF_IM_R |= 0x04; arm interrupt on PF2 (Echo)
+	GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2, GPIO_BOTH_EDGES);
+	//GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_FALLING_EDGE);
+	                                                              //GPIO_PORTF_IS_R &= ~0x04;	PF2 are edge sensitive
+	                                                              //GPIO_PORTF_IBE_R &= ~0x04;  PF2 not both edge triggered, depends on IEV register
+	                                                              //GPIO_PORTF_IEV_R |= 0x04;PF2 are rising-edged event
+}
+void InterruptB_Init(void)
+{
+	IntEnable(INT_GPIOB);								                          // Enable interrupt 30 in NVIC, Code: NVIC_EN0_R |= 0x40000000;
+	IntPrioritySet(INT_GPIOB, 0x00);		                          // Set interrupt priority 0 bits 23-21:010, Code: NVIC_PRI7_R &= ~0x00E00000
+	GPIOIntEnable(GPIO_PORTB_BASE, GPIO_INT_PIN_1);								// arm interrupt on PB1 (Echo)
+	GPIOIntTypeSet(GPIO_PORTB_BASE, GPIO_PIN_1, GPIO_BOTH_EDGES);
+}
+
+void Timer0A_Handler(void)
+{
+	TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);				 // Clear trigger flag for Timer0A
+	IntRegister(INT_TIMER0A, Timer0A_Handler);
+	TimerDisable(TIMER0_BASE, TIMER_A);
+	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0x00); 			 // Set Trigger pin low
+	// Create 10us pulse
+//	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // Set Trigger pin high
+//	SysCtlDelay(27);				 															 // Make 10us delay, 27, (10e-6*SysCtlClockGet()-2)/3 + 1
+//	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0x00); 			 // Set Trigger pin low
+}
+
+void Timer1A_Handler(void)
+{
+	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);				 // Clear trigger flag for Timer1A
+	IntRegister(INT_TIMER1A, Timer1A_Handler);
+	TimerDisable(TIMER1_BASE, TIMER_A);
+	GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x00); 			 // Set Trigger pin low
+}
+
+void GPIOPortF_Handler(void)
+{
+	if(GPIO_PORTF_RIS_R&0x04)
+	{
+		// Clear trigger flag echo pin
+		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_2);
+	
+		// count while there's pulse from echo pin rising
+		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_2)== GPIO_PIN_2)
+		{
+			// Initialize Timer0B with value 0
+        HWREG(TIMER0_BASE + TIMER_O_TBV) = 0;
+        // Enable Timer0 to start measuring duration for which Echo Pin is High
+        TimerEnable(TIMER0_BASE, TIMER_B);
+		}
+		// falling edge
+		else
+		{
+			duration0 = TimerValueGet(TIMER0_BASE, TIMER_B);
+			TimerDisable(TIMER0_BASE, TIMER_B);
+			distance0 = duration0*17150/SysCtlClockGet();
+			
+			if((distance0>0) & (distance0 < 4.5))
+			{
+				PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, 625);
+				SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);
+			}
+			else
+			{
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
+				PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, 375);
+			}
+			
+			// Enable condition for Trigger Pulse
+       trigok0 = 1;
+		}
+	}
+	
+	// If red LED on
+	if(GPIO_PORTF_RIS_R&0x02)
+	{
+		// clear trigger flag for PF1
+		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_1);
+		// increment at rising edge
+		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_1)==0x02)
+		{
+			cars_count++;
+		}
+		// decrement at falling edge
+		else
+		{
+			cars_count--;
+		}
+	}
+//	if(GPIO_PORTF_RIS_R&0x10)
+//	{
+//		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_4);
+//		// If SW1 is pressed
+//		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_4)== 0)
+//		{
+//			PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, 625);
+//			SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);
+//		}
+//		// falling edge
+//		else
+//		{
+//			PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, 375);
+//		}
+//	}
+}
+
+// interrupt for counting cars leaving
+void GPIOPortB_Handler(void)
+{
+	if(GPIO_PORTB_RIS_R&0x02)
+	{
+		// Clear trigger flag echo pin
+		GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1);
+	
+		// count while there's pulse from echo pin rising
+		if(GPIOPinRead(GPIO_PORTB_BASE, GPIO_PIN_1)== GPIO_PIN_1)
+		{
+			// Initialize Timer1B with value 0
+        HWREG(TIMER1_BASE + TIMER_O_TBV) = 0;
+        // Enable Timer1 to start measuring duration for which Echo Pin is High
+        TimerEnable(TIMER1_BASE, TIMER_B);
+		}
+		// falling edge
+		else
+		{
+			duration1 = TimerValueGet(TIMER1_BASE, TIMER_B);
+			TimerDisable(TIMER1_BASE, TIMER_B);
+			distance1 = duration1*17150/SysCtlClockGet();
+			
+			if((distance1>0) & (distance1 < 4.5))
+			{
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);
+			}
+			else
+			{
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
+			}
+			
+			// Enable condition for Trigger Pulse
+       trigok1 = 1;
+		}
+	}
+}
+
+int main(void)
+{
+	// Set clock rate to 400M/2/25 = 8MHz. (or 40MHz, divide by 5)
+	SysCtlClockSet(SYSCTL_SYSDIV_25|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
+	
+	unsigned long reload = 480000;			// reload value to generate 60ms delay
+	uint32_t period = 5000; 						//20ms (8MHz / 32pwm_divider / 50Hz)
+	uint32_t duty = 375;     						//1.5ms pulse width (0 degrees), 0(1.5ms) mid, +90(~2.4ms) left, -90(0.5ms) right	
+	
+	// Initialize GPIOportF, PF2, PF3
+	PortFunctionInit();
+	
+	// Configure PB6,PB7 as PWM										
+	ConfigurePWM(period, duty);
+	
+	// Run PortF interrupt
+	InterruptF_Init();
+	
+	// Run PortB interrupt
+	InterruptB_Init();
+	
+	// Run Timer interrupt
+	Timers_Init();
+	
+	// Globally enable interrupt
+	IntMasterEnable();
+
+	while(1)
+  {
+		if(trigok0)
+		{
+			// Load timer value 10us 
+			TimerLoadSet(TIMER0_BASE, TIMER_A, (SysCtlClockGet()*10e-6) - 1);
+			// Set trig pin high
+			GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
+			// Enable Timer0A to cause interrupt
+			TimerEnable(TIMER0_BASE, TIMER_A);								
+			// Disable trig flag
+			trigok0 = 0;
+		}
+		
+		if(trigok1)
+		{
+			// Load timer value 10us 
+			TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet()*10e-6) - 1);
+			// Set trig pin high
+			GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, GPIO_PIN_0);
+			// Enable Timer0A to cause interrupt
+			TimerEnable(TIMER1_BASE, TIMER_A);								
+			// Disable trig flag
+			trigok1 = 0;
+		}
+  }
+}
