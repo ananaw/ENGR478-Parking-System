@@ -2,7 +2,7 @@
 // Hardware PWM proof of concept using
 // the Tiva C Launchpad
 //
-// 
+// Only 1 sensor works
 //
 //
 // This drives servo motors 90 degrees to left on PWM PB6, PB7 when 
