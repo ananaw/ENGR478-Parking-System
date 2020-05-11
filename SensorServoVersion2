@@ -33,7 +33,7 @@ volatile bool trigok3 = 1;			// trig condition for sensor 4
 volatile bool trigok4 = 1;			// trig condition for sensor 5
 volatile uint32_t cars_count = 0;
 volatile uint32_t Disabled_count = 0;
-volatile uint32_t count;
+volatile uint32_t prev_count;
 volatile float duration0;
 volatile float distance0;
 volatile float duration1;
@@ -51,39 +51,38 @@ void PortFunctionInit(void)
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
 
 	// Enable pin PF3 for GPIOOutput (green) Trig
-	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_3|GPIO_PIN_1);
+	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_3|GPIO_PIN_1|GPIO_PIN_2);
 
 	// Enable pin PF2 for GPIOInput (blue) Echo
-	GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_2|GPIO_PIN_4);
+	GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 	
 	// Set output 2mA current strength, push-pull pin *STD, and weak pull down *WPD.
-	GPIOPadConfigSet(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
+	//GPIOPadConfigSet(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
 	
 	//Enable pull-up on PF4 
 	//GPIO_PORTF_PUR_R |= 0x10; 
 	
-	// Enable clock for Port B peripheral
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+	// Enable clock for Port D peripheral
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
 	
-	// Enable pin PB0,2,4,6 for GPIOOutput Trig
-	GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, GPIO_PIN_0|GPIO_PIN_2|GPIO_PIN_4|GPIO_PIN_6);
+	// Enable pin PD0,2,6 for GPIOOutput Trig
+	GPIOPinTypeGPIOOutput(GPIO_PORTD_BASE, GPIO_PIN_0|GPIO_PIN_2);
 
-	// Enable pin PB1,3,5,7 for GPIOInput  Echo
-	GPIOPinTypeGPIOInput(GPIO_PORTB_BASE, GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7);
+	// Enable pin PD1,3,7 for GPIOInput  Echo
+	GPIOPinTypeGPIOInput(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3);
 	
 	// Set output 2mA current strength, push-pull pin *STD, and weak pull down *WPD.
-	GPIOPadConfigSet(GPIO_PORTB_BASE, GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
-	
-	// Enable clock for Port C peripheral
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
-	
-	// Enable pin PC4,5,6 for Output
-	GPIOPinTypeGPIOOutput(GPIO_PORTC_BASE, GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6);
+	GPIOPadConfigSet(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
 	
 	// Enable peripheral clocks for UART0 
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
   SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
 	
+	// Enable pin PA2,4,6 for Output (Trig)
+	GPIOPinTypeGPIOOutput(GPIO_PORTA_BASE, GPIO_PIN_2|GPIO_PIN_4|GPIO_PIN_6);
+	// Enable pin PA3,5,7 for Input	 (Echo)
+	GPIOPinTypeGPIOInput(GPIO_PORTA_BASE, GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7);
+	GPIOPadConfigSet(GPIO_PORTA_BASE, GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
 	//
   // Enable pin PA0 & PA1 for UART0 U0RX
   //
@@ -100,7 +99,7 @@ void PortFunctionInit(void)
 	//UART1_LCRH_R = 0x00000060;  // 8 bit, no parity bits, one stop, no FIFOs
 	
 	// Disable FIFO (First In First Out) registers. 
-	UARTFIFODisable(UART0_BASE);
+	//UARTFIFODisable(UART0_BASE);
 }
 
 void
@@ -112,7 +111,7 @@ ConfigurePWM(uint32_t period, uint32_t duty)
     // Enable E peripheral used by this program.
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
     SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM0);  //Tiva Launchpad has two modules (0 and 1). Module 0 covers the E peripheral
-
+	
     //Configure PE4,PE5 Pins as PWM
     GPIOPinConfigure(GPIO_PE4_M0PWM4);
     GPIOPinConfigure(GPIO_PE5_M0PWM5);
@@ -140,27 +139,31 @@ void Timers_Init()		//unsigned long reload
 {
 	//Timer 0A interrupt, 0B count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);			// enable peripheral clock for Timer0A
+	//TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM);
 	TimerDisable(TIMER0_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER0_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
+	TimerConfigure(TIMER0_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_ONE_SHOT|TIMER_CFG_B_ONE_SHOT_UP);	// configure for periodic mode
 	//TimerLoadSet(TIMER0_BASE, TIMER_A, reload-1);			// reload value of 60ms
-	IntPrioritySet(INT_TIMER0A, 0x20);								// Set priority as 1
+	IntPrioritySet(INT_TIMER0A, 0x00);								// Set priority as 1
 	IntEnable(INT_TIMER0A);														// Enable interrupt 35 in NVIC
 	TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
 	TimerEnable(TIMER0_BASE, TIMER_B);
+	TimerControlEvent(TIMER0_BASE, TIMER_B, TIMER_EVENT_BOTH_EDGES);
 	
 	// Timer 1A interrupt,1B count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);			// enable peripheral clock for Timer1A
+	//TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM);
 	TimerDisable(TIMER1_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER1_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
+	TimerConfigure(TIMER1_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_ONE_SHOT|TIMER_CFG_B_ONE_SHOT_UP);	// configure for periodic mode
 	IntPrioritySet(INT_TIMER1A, 0x20);								// Set priority as 1
 	IntEnable(INT_TIMER1A);														// Enable interrupt  
 	TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
 	TimerEnable(TIMER1_BASE, TIMER_B);								// Enable Timer1B
+	TimerControlEvent(TIMER1_BASE, TIMER_B, TIMER_EVENT_BOTH_EDGES);
 
 	// Timer 2A interrupt,2B count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);			// enable peripheral clock for Timer2A
 	TimerDisable(TIMER2_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER2_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
+	TimerConfigure(TIMER2_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_ONE_SHOT|TIMER_CFG_B_ONE_SHOT_UP);	// configure for periodic mode
 	IntPrioritySet(INT_TIMER2A, 0x20);								// Set priority as 1
 	IntEnable(INT_TIMER2A);														// Enable interrupt 
 	TimerIntEnable(TIMER2_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
@@ -169,7 +172,7 @@ void Timers_Init()		//unsigned long reload
 	// Timer 3A interrupt,3B count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER3);			// enable peripheral clock for Timer3A
 	TimerDisable(TIMER3_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER3_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
+	TimerConfigure(TIMER3_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_ONE_SHOT|TIMER_CFG_B_ONE_SHOT_UP);	// configure for periodic mode
 	IntPrioritySet(INT_TIMER3A, 0x20);								// Set priority as 1
 	IntEnable(INT_TIMER3A);														// Enable interrupt 
 	TimerIntEnable(TIMER3_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
@@ -178,7 +181,7 @@ void Timers_Init()		//unsigned long reload
 	// Timer 4A interrupt,4B count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER4);			// enable peripheral clock for Timer2A
 	TimerDisable(TIMER4_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER4_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
+	TimerConfigure(TIMER4_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_ONE_SHOT|TIMER_CFG_B_ONE_SHOT_UP);	// configure for periodic mode
 	IntPrioritySet(INT_TIMER4A, 0x20);								// Set priority as 1
 	IntEnable(INT_TIMER4A);														// Enable interrupt 35 in NVIC
 	TimerIntEnable(TIMER4_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
@@ -196,20 +199,21 @@ void InterruptF_Init(void)
 	                                                              //GPIO_PORTF_IBE_R &= ~0x04;  PF2 not both edge triggered, depends on IEV register
 	                                                              //GPIO_PORTF_IEV_R |= 0x04;PF2 are rising-edged event
 }
-void InterruptB_Init(void)
+
+void InterruptA_Init(void)
 {
-	IntEnable(INT_GPIOB);								                          // Enable interrupt 30 in NVIC, Code: NVIC_EN0_R |= 0x40000000;
-	IntPrioritySet(INT_GPIOB, 0x40);		                          // Set interrupt priority 0 bits 23-21:010, Code: NVIC_PRI7_R &= ~0x00E00000
-	GPIOIntEnable(GPIO_PORTB_BASE, GPIO_INT_PIN_1|GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7);								// arm interrupt on PB1 (Echo)
-	GPIOIntTypeSet(GPIO_PORTB_BASE, GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7, GPIO_BOTH_EDGES);
+	IntEnable(INT_GPIOA);								                          // Enable interrupt 
+	IntPrioritySet(INT_GPIOA, 0x00);		                          // Set interrupt priority 0 
+	GPIOIntEnable(GPIO_PORTA_BASE, GPIO_INT_PIN_3|GPIO_INT_PIN_5|GPIO_INT_PIN_7);		//arm interrupt on PC0,1,2 (Echo)
+	GPIOIntTypeSet(GPIO_PORTA_BASE, GPIO_INT_PIN_3|GPIO_INT_PIN_5|GPIO_INT_PIN_7, GPIO_BOTH_EDGES);		// interrupt on both edges
 }
 
-void InterruptC_Init(void)
+void InterruptD_Init(void)
 {
-	IntEnable(INT_GPIOC);								                          // Enable interrupt 
-	IntPrioritySet(INT_GPIOC, 0x20);		                          // Set interrupt priority 0 
-	GPIOIntEnable(GPIO_PORTC_BASE, GPIO_INT_PIN_5|GPIO_INT_PIN_6);		//arm interrupt on PC0,1,2 (Echo)
-	GPIOIntTypeSet(GPIO_PORTC_BASE, GPIO_PIN_5|GPIO_PIN_6, GPIO_BOTH_EDGES);		// interrupt on both edges
+	IntEnable(INT_GPIOD);								                          // Enable interrupt 30 in NVIC, Code: NVIC_EN0_R |= 0x40000000;
+	IntPrioritySet(INT_GPIOD, 0x00);		                          // Set interrupt priority 0 bits 23-21:010, Code: NVIC_PRI7_R &= ~0x00E00000
+	GPIOIntEnable(GPIO_PORTD_BASE, GPIO_INT_PIN_1|GPIO_INT_PIN_3);								// arm interrupt on PB1 (Echo)
+	GPIOIntTypeSet(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3, GPIO_BOTH_EDGES);
 }
 
 void Timer0A_Handler(void)															 // Timer for sensor 1
@@ -217,7 +221,7 @@ void Timer0A_Handler(void)															 // Timer for sensor 1
 	TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);				 // Clear trigger flag for Timer0A
 	IntRegister(INT_TIMER0A, Timer0A_Handler);
 	TimerDisable(TIMER0_BASE, TIMER_A);
-	GPIOPinWrite(GPIO_PORTC_BASE, GPIO_PIN_4, 0x00); 			 // Set Trigger pin low
+	GPIOPinWrite(GPIO_PORTD_BASE, GPIO_PIN_2, 0x00); 			 // Set Trigger pin low
 	
 	// Create 10us pulse
 //	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); // Set Trigger pin high
@@ -228,9 +232,9 @@ void Timer0A_Handler(void)															 // Timer for sensor 1
 void Timer1A_Handler(void)															 // Timer for sensor 2
 {
 	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);				 // Clear trigger flag for Timer1A
-	//IntRegister(INT_TIMER1A, Timer1A_Handler);
+	IntRegister(INT_TIMER1A, Timer1A_Handler);
 	TimerDisable(TIMER1_BASE, TIMER_A);
-	GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x00); 			 // Set Trigger pin low
+	GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_2, 0x00); 			 // Set Trigger pin low
 }
 
 void Timer2A_Handler(void)															 // Timer for sensor 3
@@ -238,7 +242,7 @@ void Timer2A_Handler(void)															 // Timer for sensor 3
 	TimerIntClear(TIMER2_BASE, TIMER_TIMA_TIMEOUT);				 // Clear trigger flag for Timer2A
 	IntRegister(INT_TIMER2A, Timer2A_Handler);
 	TimerDisable(TIMER2_BASE, TIMER_A);
-	GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, 0x00); 			 // Set Trigger pin low
+	GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_4, 0x00); 			 // Set Trigger pin low
 }
 
 void Timer3A_Handler(void)															 // Timer for sensor 4
@@ -246,7 +250,7 @@ void Timer3A_Handler(void)															 // Timer for sensor 4
 	TimerIntClear(TIMER3_BASE, TIMER_TIMA_TIMEOUT);				 // Clear trigger flag for Timer3A
 	IntRegister(INT_TIMER3A, Timer3A_Handler);
 	TimerDisable(TIMER3_BASE, TIMER_A);
-	GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_4, 0x00); 			 // Set Trigger pin low
+	GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_6, 0x00); 			 // Set Trigger pin low
 }
 
 void Timer4A_Handler(void)															 // Timer for sensor 5 (disabled)
@@ -254,18 +258,18 @@ void Timer4A_Handler(void)															 // Timer for sensor 5 (disabled)
 	TimerIntClear(TIMER4_BASE, TIMER_TIMA_TIMEOUT);				 // Clear trigger flag for Timer4A
 	IntRegister(INT_TIMER4A, Timer4A_Handler);
 	TimerDisable(TIMER4_BASE, TIMER_A);
-	GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_6, 0x00); 			 // Set Trigger pin low
+	GPIOPinWrite(GPIO_PORTD_BASE, GPIO_PIN_0, 0x00); 			 // Set Trigger pin low
 }
 
-void GPIOPortF_Handler(void)
+void GPIOPortD_Handler(void)			// C interrupt to count cars
 {
-	if(GPIO_PORTF_RIS_R&0x04)
+	if(GPIO_PORTD_RIS_R&0x08)				// if PD3 has action
 	{
 		// Clear trigger flag echo pin
-		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_2);
+		GPIOIntClear(GPIO_PORTD_BASE, GPIO_INT_PIN_3);
 	
 		// count while there's pulse from echo pin rising
-		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_2)== GPIO_PIN_2)
+		if(GPIOPinRead(GPIO_PORTD_BASE, GPIO_PIN_3)== GPIO_PIN_3)
 		{
 			// Initialize Timer0B with value 0
         HWREG(TIMER0_BASE + TIMER_O_TBV) = 0;
@@ -275,25 +279,41 @@ void GPIOPortF_Handler(void)
 		// falling edge
 		else
 		{
-			duration0 = TimerValueGet(TIMER0_BASE, TIMER_B);
 			TimerDisable(TIMER0_BASE, TIMER_B);
-			distance0 = duration0/464;//*17000/SysCtlClockGet();
+			duration0 = TimerValueGet(TIMER0_BASE, TIMER_B);
+			distance0 = duration0/470;//*17000/SysCtlClockGet(); 232 for 4Mhz
 			
-			if((distance0>0) & (distance0 < 4))
+			if(((cars_count<4)||(Disabled_count < 1))&&(distance0 < 4))
 			{
 				cars_count++;
-				char message[] = "Regular Spot: ";
-				for (int k = 0; k<sizeof(message); k++)
-				{
-					UARTCharPut(UART0_BASE, message[k]);
-				}
-				char cars = cars_count + '0';
-				UARTCharPut(UART0_BASE, cars);
-				char message3[] = "/3 Disabled Spot: 0/1\n\r";
-				for (int k = 0; k<sizeof(message3); k++)
-				{
-					UARTCharPut(UART0_BASE, message3[k]);
-				}
+//				if((cars_count<4)&&(Disabled_count<1))
+//		{
+//			char message[] = "Regular Spot: ";
+//				for (int k = 0; k<sizeof(message); k++)
+//				{
+//					UARTCharPut(UART0_BASE, message[k]);
+//				}
+//				char cars = cars_count + '0';
+//				char disabled = Disabled_count + '0';
+//				UARTCharPut(UART0_BASE, cars);
+//				
+//				char message2[] = "/3 Disabled Spot: ";
+//				for (int k = 0; k<sizeof(message2); k++)
+//				{
+//					UARTCharPut(UART0_BASE, message2[k]);
+//				}
+//				
+//				UARTCharPut(UART0_BASE, disabled);
+//				char message3[] = "/1\n\r";
+//				for (int k = 0; k<sizeof(message3); k++)
+//				{
+//					UARTCharPut(UART0_BASE, message3[k]);
+//				}
+//			}
+//				if(cars_count>3)
+//				{
+//					
+//				}
 				PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, 625);
 				SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);
 			}	
@@ -303,96 +323,110 @@ void GPIOPortF_Handler(void)
 			}
 			
 			// Enable condition for Trigger Pulse
-       trigok0 = 1;
+      trigok0 = 1;
 		}
 	}
 	
-	// If red LED on
-	if(GPIO_PORTF_RIS_R&0x02)
-	{
-		// clear trigger flag for PF1
-		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_1);
-		// increment at rising edge
-		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_1)==GPIO_PIN_1)
+	if(GPIO_PORTD_RIS_R&0x02)																	// if PD1 has action 
+	{	
+		GPIOIntClear(GPIO_PORTD_BASE, GPIO_INT_PIN_1);					// Clear trigger flag echo pin
+	
+		// count while there's pulse from echo pin rising
+		if(GPIOPinRead(GPIO_PORTD_BASE, GPIO_PIN_1)== GPIO_PIN_1)		// if PD1 high
 		{
-			//cars_count;
+        HWREG(TIMER4_BASE + TIMER_O_TBV) = 0;								// Initialize Timer1B with value 0
+        
+        TimerEnable(TIMER4_BASE, TIMER_B);									// Enable Timer1 to start measuring duration for which Echo Pin is High
 		}
-		// decrement at falling edge
+		// falling edge
 		else
 		{
-			//cars_count--;
-//			char message[] = "1st Spot Empty\n\r";
-//				for (int k = 0; k<sizeof(message); k++)
-//				{
-//					UARTCharPut(UART0_BASE, message[k]);
-//				}
+			TimerDisable(TIMER4_BASE, TIMER_B);										// disable timer
+			duration4 = TimerValueGet(TIMER4_BASE, TIMER_B);			// get value of timer
+			distance4 = duration4/464;														//*17000/SysCtlClockGet();convert to distance
+			
+			if(distance4 < 5)
+			{
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 0);		// turn off all LED
+			}
+//			else
+//			{
+//				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3);
+//			}
+      trigok4 = 1;						// Enable condition for Trigger Pulse
 		}
 	}
-	if(GPIO_PORTF_RIS_R&0x08)
+}
+// not used 
+void GPIOPortF_Handler(void)
+{
+//	// If red LED on
+//	if(GPIO_PORTF_RIS_R&0x02)
+//	{
+//		// clear trigger flag for PF1
+//		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_1);
+//		
+//		// increment at rising edge
+//		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_1)==GPIO_PIN_1)
+//		{
+//			cars_count++;
+//		}
+//		// decrement at falling edge
+//		else
+//		{
+//			cars_count--;
+//			
+////			char message[] = "1st Spot Empty\n\r";
+////				for (int k = 0; k<sizeof(message); k++)
+////				{
+////					UARTCharPut(UART0_BASE, message[k]);
+////				}
+//		}
+//		prev_count = cars_count;
+//	}
+//	
+//	// if blue LED on
+//	if(GPIO_PORTF_RIS_R&0x04)
+//	{
+//		// clear trigger flag for PF1
+//		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_2);
+//		
+//		// increment at rising edge
+//		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_2)==GPIO_PIN_2)
+//		{
+//			cars_count++;
+//		}
+//		// decrement at falling edge
+//		else
+//		{
+//			cars_count--;
+////			char message[] = "2nd Spot Empty\n\r";
+////				for (int k = 0; k<sizeof(message); k++)
+////				{
+////					UARTCharPut(UART0_BASE, message[k]);
+////				}
+//		}
+//		prev_count = cars_count;
+//	}
+	
+	if(GPIO_PORTF_RIS_R&0x0E)
 	{
 		// clear trigger flag for PF3
-		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_3);
+		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_1|GPIO_INT_PIN_2|GPIO_INT_PIN_3);
 		// increment at rising edge
-		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_3)==GPIO_PIN_3)
+		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3)==0)
 		{
 			Disabled_count++;
 			cars_count--;
-			//cars_count;
-			char cars = cars_count + '0';
-			char disabled = Disabled_count + '0';
-				char message2[] = "Regular Spot: ";
-				for (int k = 0; k<sizeof(message2); k++)
-				{
-					UARTCharPut(UART0_BASE, message2[k]);
-				}
-				
-				UARTCharPut(UART0_BASE, cars);
-				char message3[] = "/3 Disabled Spot: ";
-				for (int k = 0; k<sizeof(message3); k++)
-				{
-					UARTCharPut(UART0_BASE, message3[k]);
-				}
 
-				UARTCharPut(UART0_BASE, disabled);
-				
-				char message1[] = "/1\n\r";
-				for (int k = 0; k<sizeof(message1); k++)
-				{
-					UARTCharPut(UART0_BASE, message1[k]);
-				}
+			
 		}
 		// decrement at falling edge
 		else
 		{
 			Disabled_count--;
-			char message5[] = "Regular Spot: ";
-				for (int k = 0; k<sizeof(message5); k++)
-				{
-					UARTCharPut(UART0_BASE, message5[k]);
-				}
-				char cars = cars_count + '0';
-				UARTCharPut(UART0_BASE, cars);
-				char message6[] = "/3 Disabled Spot: ";
-				for (int k = 0; k<sizeof(message6); k++)
-				{
-					UARTCharPut(UART0_BASE, message6[k]);
-				}
-				
-				char disabled = Disabled_count + '0';
-				UARTCharPut(UART0_BASE, disabled);
-				
-				char message8[] = "/1\n\r";
-				for (int k = 0; k<sizeof(message8); k++)
-				{
-					UARTCharPut(UART0_BASE, message8[k]);
-				}
-			//cars_count--;
-//			char message1[] = "2nd Spot Empty\n\r";
-//				for (int i = 0; i<sizeof(message1); i++)
-//				{
-//					UARTCharPut(UART0_BASE, message1[i]);
-//				}
 		}
+		prev_count = cars_count;
 	}
 	
 //	if(GPIO_PORTF_RIS_R&0x10)
@@ -412,69 +446,15 @@ void GPIOPortF_Handler(void)
 //	}
 }
 
-void GPIOPortC_Handler(void)			// C interrupt to count cars
-{
-	// If PC4 is high
-//	if(GPIO_PORTC_RIS_R&0x10)
-//	{
-//		// clear trigger flag for PC4
-//		GPIOIntClear(GPIO_PORTC_BASE, GPIO_INT_PIN_4);
-//		// increment at rising edge
-//		if(GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_4)==0x10)
-//		{
-//			cars_count++;
-//		}
-//		// decrement at falling edge
-//		else
-//		{
-//			cars_count--;
-//		}
-//	}
-	
-	// If PC5 is high
-	if(GPIO_PORTC_RIS_R&0x20)
-	{
-		// clear trigger flag for PC5
-		GPIOIntClear(GPIO_PORTC_BASE, GPIO_INT_PIN_5);
-		// increment at rising edge
-		if(GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_5)==0x20)
-		{
-			cars_count++;
-		}
-		// decrement at falling edge
-		else
-		{
-			cars_count--;
-		}
-	}
-	
-	// If PC6 is high					(disabled car spot)
-	if(GPIO_PORTC_RIS_R&0x40)
-	{
-		// clear trigger flag for PC6
-		GPIOIntClear(GPIO_PORTC_BASE, GPIO_INT_PIN_6);
-		// increment at rising edge
-		if(GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_6)==0x40)
-		{
-			Disabled_count++;
-			cars_count--;
-		}
-		// decrement at falling edge
-		else
-		{
-			Disabled_count--;
-		}
-	}
-}
 // interrupt for counting cars leaving
-void GPIOPortB_Handler(void)
+void GPIOPortA_Handler(void)
 {
-	if(GPIO_PORTB_RIS_R&0x02)																	// if PB1 has action 
+	if(GPIO_PORTA_RIS_R&0x08)																	// if PA3 has action 
 	{	
-		GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1);					// Clear trigger flag echo pin
+		GPIOIntClear(GPIO_PORTA_BASE, GPIO_INT_PIN_3);					// Clear trigger flag echo pin
 	
 		// count while there's pulse from echo pin rising
-		if(GPIOPinRead(GPIO_PORTB_BASE, GPIO_PIN_1)== GPIO_PIN_1)		// if PB1 high
+		if(GPIOPinRead(GPIO_PORTA_BASE, GPIO_PIN_3)== GPIO_PIN_3)		// if PB1 high
 		{
         HWREG(TIMER1_BASE + TIMER_O_TBV) = 0;								// Initialize Timer1B with value 0
         
@@ -483,14 +463,13 @@ void GPIOPortB_Handler(void)
 		// falling edge
 		else
 		{
-			TimerDisable(TIMER1_BASE, TIMER_B);													// disable timer
 			duration1 = TimerValueGet(TIMER1_BASE, TIMER_B);						// get value of timer
+			TimerDisable(TIMER1_BASE, TIMER_B);													// disable timer
 			distance1 = duration1/464;//*17000/SysCtlClockGet();								// convert to distance
 			
-			if((distance1>0) & (distance1 < 5))
+			if(distance1 < 5)
 			{
 				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);		// turn on red LED
-				//SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);
 			}
 			else
 			{
@@ -500,12 +479,12 @@ void GPIOPortB_Handler(void)
 		}
 	}
 	
-	if(GPIO_PORTB_RIS_R&0x08)																	// if PB3 has action 
+	if(GPIO_PORTA_RIS_R&0x20)																	// if PA5 has action 
 	{	
-		GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_3);					// Clear trigger flag echo pin
+		GPIOIntClear(GPIO_PORTA_BASE, GPIO_INT_PIN_5);					// Clear trigger flag echo pin
 	
 		// count while there's pulse from echo pin rising
-		if(GPIOPinRead(GPIO_PORTB_BASE, GPIO_PIN_3)== GPIO_PIN_3)		// if PB3 high
+		if(GPIOPinRead(GPIO_PORTA_BASE, GPIO_PIN_5)== GPIO_PIN_5)		// if PB3 high
 		{
         HWREG(TIMER2_BASE + TIMER_O_TBV) = 0;								// Initialize Timer2B with value 0
         
@@ -518,28 +497,29 @@ void GPIOPortB_Handler(void)
 			TimerDisable(TIMER2_BASE, TIMER_B);
 			distance2 = duration2/464;//*17000/SysCtlClockGet();
 			
-			if((distance2>0) & (distance2 < 5))
+			if(distance2 < 5)
 			{
-				//GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
 			}
 			else
 			{
-				//GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
 			}
       trigok2 = 1;						// Enable condition for Trigger Pulse
 		}
 	}
 	
-	if(GPIO_PORTB_RIS_R&0x20)																	// if PB5 has action 
+	
+	if(GPIO_PORTA_RIS_R&0x80)																	// if PA7 has action 
 	{	
-		GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_5);					// Clear trigger flag echo pin
+		GPIOIntClear(GPIO_PORTA_BASE, GPIO_INT_PIN_7);					// Clear trigger flag echo pin
 	
 		// count while there's pulse from echo pin rising
-		if(GPIOPinRead(GPIO_PORTB_BASE, GPIO_PIN_5)== GPIO_PIN_5)		// if PB5 high
+		if(GPIOPinRead(GPIO_PORTA_BASE, GPIO_PIN_7)== GPIO_PIN_7)		// if PB7 high
 		{
-        HWREG(TIMER3_BASE + TIMER_O_TBV) = 0;								// Initialize Timer3B with value 0
+        HWREG(TIMER3_BASE + TIMER_O_TBV) = 0;								// Initialize Timer4B with value 0
         
-        TimerEnable(TIMER3_BASE, TIMER_B);									// Enable Timer3 to start measuring duration for which Echo Pin is High
+        TimerEnable(TIMER3_BASE, TIMER_B);									// Enable Timer4 to start measuring duration for which Echo Pin is High
 		}
 		// falling edge
 		else
@@ -548,37 +528,7 @@ void GPIOPortB_Handler(void)
 			TimerDisable(TIMER3_BASE, TIMER_B);
 			distance3 = duration3/464;//*17000/SysCtlClockGet();
 			
-			if((distance3>0) & (distance3 < 4))
-			{
-				GPIOPinWrite(GPIO_PORTC_BASE, GPIO_PIN_5, GPIO_PIN_5);
-			}
-			else
-			{
-				GPIOPinWrite(GPIO_PORTC_BASE, GPIO_PIN_5, 0);
-			}
-      trigok3 = 1;						// Enable condition for Trigger Pulse
-		}
-	}
-	
-	if(GPIO_PORTB_RIS_R&0x80)																	// if PB7 has action 
-	{	
-		GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_7);					// Clear trigger flag echo pin
-	
-		// count while there's pulse from echo pin rising
-		if(GPIOPinRead(GPIO_PORTB_BASE, GPIO_PIN_7)== GPIO_PIN_7)		// if PB7 high
-		{
-        HWREG(TIMER4_BASE + TIMER_O_TBV) = 0;								// Initialize Timer4B with value 0
-        
-        TimerEnable(TIMER4_BASE, TIMER_B);									// Enable Timer4 to start measuring duration for which Echo Pin is High
-		}
-		// falling edge
-		else
-		{
-			duration4 = TimerValueGet(TIMER4_BASE, TIMER_B);
-			TimerDisable(TIMER4_BASE, TIMER_B);
-			distance4 = duration4/464;//*17000/SysCtlClockGet();
-			
-			if((distance4>0) & (distance4 < 5))
+			if(distance3 < 5)
 			{
 				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
 			}
@@ -586,7 +536,7 @@ void GPIOPortB_Handler(void)
 			{
 				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
 			}
-      trigok4 = 1;						// Enable condition for Trigger Pulse
+      trigok3 = 1;						// Enable condition for Trigger Pulse
 		}
 	}
 }
@@ -606,23 +556,24 @@ int main(void)
 	// Configure PB6,PB7 as PWM										
 	ConfigurePWM(period, duty);
 	
-	GPIOPinWrite(GPIO_PORTC_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 0);
-	// Run PortF interrupt
-	InterruptF_Init();
-	
-	// Run PortB interrupt
-	InterruptB_Init();
-	
-	// Run PortC interrupt
-	//InterruptC_Init();
-	
 	// Run Timer interrupt
 	Timers_Init();
 	
+	// Run PortB interrupt
+	InterruptD_Init();	
+	
+	// Run PortC interrupt
+	InterruptA_Init();
+	
+	// Run PortF interrupt
+	//InterruptF_Init();
+		
 	// Globally enable interrupt
 	IntMasterEnable();
 	
-	char message0[] = "Welcome to Pi Garage! All spots are empty!\n\r";
+	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 0);
+	
+	char message0[] = "Welcome to Pi Parking Garage! All spots are empty!\n\r";
 				for (int n = 0; n<sizeof(message0); n++)
 				{
 					UARTCharPut(UART0_BASE, message0[n]);
@@ -633,9 +584,9 @@ int main(void)
 		if(trigok0)
 		{
 			// Load timer value 10us 
-			TimerLoadSet(TIMER0_BASE, TIMER_A, (SysCtlClockGet()*10e-6) - 1);
+			TimerLoadSet(TIMER0_BASE, TIMER_A, (SysCtlClockGet()/100000) - 1);
 			// Set trig pin high
-			GPIOPinWrite(GPIO_PORTC_BASE, GPIO_PIN_4, GPIO_PIN_4);
+			GPIOPinWrite(GPIO_PORTD_BASE, GPIO_PIN_2, GPIO_PIN_2);
 			// Enable Timer0A to cause interrupt
 			TimerEnable(TIMER0_BASE, TIMER_A);								
 			// Disable trig flag
@@ -645,9 +596,9 @@ int main(void)
 		if(trigok1)
 		{
 			// Load timer value 10us 
-			TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet()*10e-6) - 1);
+			TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet()/100000) - 1);
 			// Set trig pin high
-			GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, GPIO_PIN_0);
+			GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_2, GPIO_PIN_2);
 			// Enable Timer0A to cause interrupt
 			TimerEnable(TIMER1_BASE, TIMER_A);								
 			// Disable trig flag
@@ -657,9 +608,9 @@ int main(void)
 		if(trigok2)
 		{
 			// Load timer value 10us 
-			TimerLoadSet(TIMER2_BASE, TIMER_A, (SysCtlClockGet()*10e-6) - 1);
+			TimerLoadSet(TIMER2_BASE, TIMER_A, (SysCtlClockGet()/100000) - 1);
 			// Set trig pin high
-			GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, GPIO_PIN_2);
+			GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_4, GPIO_PIN_4);
 			// Enable Timer2A to cause interrupt
 			TimerEnable(TIMER2_BASE, TIMER_A);								
 			// Disable trig flag
@@ -669,9 +620,9 @@ int main(void)
 		if(trigok3)
 		{
 			// Load timer value 10us 
-			TimerLoadSet(TIMER3_BASE, TIMER_A, (SysCtlClockGet()*10e-6) - 1);
+			TimerLoadSet(TIMER3_BASE, TIMER_A, (SysCtlClockGet()/100000) - 1);
 			// Set trig pin high
-			GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_4, GPIO_PIN_4);
+			GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_6, GPIO_PIN_6);
 			// Enable Timer3A to cause interrupt
 			TimerEnable(TIMER3_BASE, TIMER_A);								
 			// Disable trig flag
@@ -681,13 +632,39 @@ int main(void)
 		if(trigok4)
 		{
 			// Load timer value 10us 
-			TimerLoadSet(TIMER4_BASE, TIMER_A, (SysCtlClockGet()*10e-6) - 1);
+			TimerLoadSet(TIMER4_BASE, TIMER_A, (SysCtlClockGet()/100000) - 1);
 			// Set trig pin high
-			GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_6, GPIO_PIN_6);
+			GPIOPinWrite(GPIO_PORTD_BASE, GPIO_PIN_0, GPIO_PIN_0);
 			// Enable Timer4A to cause interrupt
 			TimerEnable(TIMER4_BASE, TIMER_A);								
 			// Disable trig flag
 			trigok4 = 0;
 		}
+
+//		while(prev_count != cars_count)
+//		{
+//			char cars = cars_count + '0';
+//			char disabled = Disabled_count + '0';
+//				char message2[] = "Regular Spot: ";
+//				for (int k = 0; k<sizeof(message2); k++)
+//				{
+//					UARTCharPut(UART0_BASE, message2[k]);
+//				}
+//				
+//				UARTCharPut(UART0_BASE, cars);
+//				char message3[] = "/3 Disabled Spot: ";
+//				for (int k = 0; k<sizeof(message3); k++)
+//				{
+//					UARTCharPut(UART0_BASE, message3[k]);
+//				}
+
+//				UARTCharPut(UART0_BASE, disabled);
+//				
+//				char message1[] = "/1\n\r";
+//				for (int k = 0; k<sizeof(message1); k++)
+//				{
+//					UARTCharPut(UART0_BASE, message1[k]);
+//				}
+//			}
   }
 }
