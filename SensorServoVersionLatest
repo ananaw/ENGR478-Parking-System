@@ -68,11 +68,19 @@ void PortFunctionInit(void)
 	GPIOPadConfigSet(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
 	
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);            		// enable GPIO port B
-	GPIOPinConfigure(GPIO_PB0_T2CCP0|GPIO_PB1_T2CCP1|GPIO_PB2_T3CCP0|GPIO_PB3_T3CCP1|GPIO_PB4_T1CCP0|GPIO_PB5_T1CCP1|GPIO_PB6_T0CCP0|GPIO_PB7_T0CCP1);				// configure for peripherals
+	GPIOPinConfigure(GPIO_PB6_T0CCP0);					// enable timer0A mode
+	GPIOPinConfigure(GPIO_PB7_T0CCP1);					// enable timer0B mode
+	GPIOPinConfigure(GPIO_PB4_T1CCP0);					// enable timer1A mode
+	GPIOPinConfigure(GPIO_PB5_T1CCP1);					// enable timer1B mode
+	GPIOPinConfigure(GPIO_PB0_T2CCP0);					// enable timer2A mode
+	GPIOPinConfigure(GPIO_PB1_T2CCP1);					// enable timer2B mode
+	GPIOPinConfigure(GPIO_PB2_T3CCP0);					// enable timer3A mode
+	GPIOPinConfigure(GPIO_PB3_T3CCP1);					// enable timer3B mode
 	GPIOPinTypeTimer(GPIO_PORTB_BASE, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6);		// configure the GPIO pins for timer
 	
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);            		// enable GPIO port C
-	GPIOPinConfigure(GPIO_PC0_T4CCP0|GPIO_PC1_T4CCP1);					// enable timer mode
+	GPIOPinConfigure(GPIO_PC0_T4CCP0);					// enable timer4A mode
+	GPIOPinConfigure(GPIO_PC1_T4CCP1);					// enable timer4B mode
 	GPIOPinTypeTimer(GPIO_PORTC_BASE, GPIO_PIN_0|GPIO_PIN_1);		// configure the GPIO pins for timer
 	
 	// Enable peripheral clocks for UART0 
