@@ -296,7 +296,7 @@ void GPIOPortD_Handler(void)			// C interrupt to count cars
 			distance0 = duration0/464;//*17000/SysCtlClockGet(); 232 for 4Mhz
 			
 			// if car park not full and there's a car in front
-			if(((cars_count<4)||(Disabled_count < 1))&&(distance0 < 4))
+			if(((cars_count<4)||(Disabled_count < 2))&&(distance0 < 4))
 			{
 				PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, 650);
 				SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);
@@ -390,7 +390,6 @@ void GPIOPortF_Handler(void)
 		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_3)==GPIO_PIN_3)
 		{
 			Disabled_count++;
-			cars_count--;
 		}
 		// decrement at falling edge
 		else
@@ -631,7 +630,17 @@ int main(void)
 			trigok4 = 0;
 		}
 		
-		if((cars_count<4)||(Disabled_count<2))
+		// display full message when carpark is full. 
+		if((cars_count==3)&&(Disabled_count==1))
+		{
+			char message4[] = "Carpark FULL!";
+			for (int k = 0; k<sizeof(message4); k++)
+			{
+				UARTCharPut(UART0_BASE, message4[k]);
+			}
+		}
+		
+		else
 		{
 			char cars = cars_count + '0';
 			char disabled = Disabled_count + '0';
@@ -654,15 +663,6 @@ int main(void)
 			for (int k = 0; k<sizeof(message1); k++)
 			{
 				UARTCharPut(UART0_BASE, message1[k]);				
-			}
-		}
-		
-		else
-		{
-			char message4[] = "Carpark FULL!";
-			for (int k = 0; k<sizeof(message4); k++)
-			{
-				UARTCharPut(UART0_BASE, message4[k]);
 			}
 		}
 //		while(prev_count != cars_count)
