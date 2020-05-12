@@ -19,7 +19,7 @@
 #include "inc/hw_timer.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/pin_map.h"
-#include "driverlib/gpio.h"
+#include "driverlib/gpio.h"  
 #include "driverlib/pwm.h"
 #include "driverlib/uart.h"
 #include "driverlib/timer.h"					// manually added
@@ -49,30 +49,31 @@ void PortFunctionInit(void)
 {
 	// Enable clock for Port F peripheral
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
-
 	// Enable pin PF3 for GPIOOutput (green) Trig
 	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_3|GPIO_PIN_1|GPIO_PIN_2);
-
 	// Enable pin PF2 for GPIOInput (blue) Echo
 	GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
-	
 	// Set output 2mA current strength, push-pull pin *STD, and weak pull down *WPD.
 	//GPIOPadConfigSet(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
-	
 	//Enable pull-up on PF4 
 	//GPIO_PORTF_PUR_R |= 0x10; 
 	
 	// Enable clock for Port D peripheral
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
-	
 	// Enable pin PD0,2,6 for GPIOOutput Trig
 	GPIOPinTypeGPIOOutput(GPIO_PORTD_BASE, GPIO_PIN_0|GPIO_PIN_2);
-
 	// Enable pin PD1,3,7 for GPIOInput  Echo
 	GPIOPinTypeGPIOInput(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3);
-	
 	// Set output 2mA current strength, push-pull pin *STD, and weak pull down *WPD.
 	GPIOPadConfigSet(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
+	
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);            		// enable GPIO port B
+	GPIOPinConfigure(GPIO_PB0_T2CCP0|GPIO_PB1_T2CCP1|GPIO_PB2_T3CCP0|GPIO_PB3_T3CCP1|GPIO_PB4_T1CCP0|GPIO_PB5_T1CCP1|GPIO_PB6_T0CCP0|GPIO_PB7_T0CCP1);				// configure for peripherals
+	GPIOPinTypeTimer(GPIO_PORTB_BASE, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6);		// configure the GPIO pins for timer
+	
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);            		// enable GPIO port C
+	GPIOPinConfigure(GPIO_PC0_T4CCP0|GPIO_PC1_T4CCP1);					// enable timer mode
+	GPIOPinTypeTimer(GPIO_PORTC_BASE, GPIO_PIN_0|GPIO_PIN_1);		// configure the GPIO pins for timer
 	
 	// Enable peripheral clocks for UART0 
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
@@ -139,13 +140,12 @@ void Timers_Init()		//unsigned long reload
 {
 	//Timer 0A interrupt, 0B count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);			// enable peripheral clock for Timer0A
-	//TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM);
 	TimerDisable(TIMER0_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER0_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_ONE_SHOT|TIMER_CFG_B_ONE_SHOT_UP);	// configure for periodic mode
+	TimerConfigure(TIMER0_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
 	//TimerLoadSet(TIMER0_BASE, TIMER_A, reload-1);			// reload value of 60ms
 	IntPrioritySet(INT_TIMER0A, 0x00);								// Set priority as 1
-	IntEnable(INT_TIMER0A);														// Enable interrupt 35 in NVIC
 	TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
+	IntEnable(INT_TIMER0A);														// Enable interrupt 35 in NVIC
 	TimerEnable(TIMER0_BASE, TIMER_B);
 	TimerControlEvent(TIMER0_BASE, TIMER_B, TIMER_EVENT_BOTH_EDGES);
 	
@@ -153,38 +153,38 @@ void Timers_Init()		//unsigned long reload
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);			// enable peripheral clock for Timer1A
 	//TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM);
 	TimerDisable(TIMER1_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER1_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_ONE_SHOT|TIMER_CFG_B_ONE_SHOT_UP);	// configure for periodic mode
+	TimerConfigure(TIMER1_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
 	IntPrioritySet(INT_TIMER1A, 0x20);								// Set priority as 1
-	IntEnable(INT_TIMER1A);														// Enable interrupt  
 	TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
+	IntEnable(INT_TIMER1A);														// Enable interrupt  
 	TimerEnable(TIMER1_BASE, TIMER_B);								// Enable Timer1B
 	TimerControlEvent(TIMER1_BASE, TIMER_B, TIMER_EVENT_BOTH_EDGES);
 
 	// Timer 2A interrupt,2B count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);			// enable peripheral clock for Timer2A
 	TimerDisable(TIMER2_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER2_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_ONE_SHOT|TIMER_CFG_B_ONE_SHOT_UP);	// configure for periodic mode
+	TimerConfigure(TIMER2_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
 	IntPrioritySet(INT_TIMER2A, 0x20);								// Set priority as 1
-	IntEnable(INT_TIMER2A);														// Enable interrupt 
 	TimerIntEnable(TIMER2_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
+	IntEnable(INT_TIMER2A);														// Enable interrupt 
 	TimerEnable(TIMER2_BASE, TIMER_B);								// Enable Timer2B
 	
 	// Timer 3A interrupt,3B count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER3);			// enable peripheral clock for Timer3A
 	TimerDisable(TIMER3_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER3_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_ONE_SHOT|TIMER_CFG_B_ONE_SHOT_UP);	// configure for periodic mode
+	TimerConfigure(TIMER3_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
 	IntPrioritySet(INT_TIMER3A, 0x20);								// Set priority as 1
-	IntEnable(INT_TIMER3A);														// Enable interrupt 
 	TimerIntEnable(TIMER3_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
+	IntEnable(INT_TIMER3A);														// Enable interrupt 
 	TimerEnable(TIMER3_BASE, TIMER_B);								// Enable Timer3B
 
 	// Timer 4A interrupt,4B count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER4);			// enable peripheral clock for Timer2A
 	TimerDisable(TIMER4_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER4_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_ONE_SHOT|TIMER_CFG_B_ONE_SHOT_UP);	// configure for periodic mode
+	TimerConfigure(TIMER4_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
 	IntPrioritySet(INT_TIMER4A, 0x20);								// Set priority as 1
-	IntEnable(INT_TIMER4A);														// Enable interrupt 35 in NVIC
 	TimerIntEnable(TIMER4_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
+	IntEnable(INT_TIMER4A);														// Enable interrupt 
 	TimerEnable(TIMER4_BASE, TIMER_B);								// Enable Timer4B
 }
 
