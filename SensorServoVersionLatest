@@ -34,7 +34,6 @@ volatile bool trigok3 = 1;			// sensor 4
 volatile bool trigok4 = 1;			// sensor 5
 volatile uint32_t cars_count = 0;
 volatile uint32_t Disabled_count = 0;
-volatile uint32_t prev_count;
 volatile bool object1 = 0;			// flag to see if object present or not
 volatile bool object2 = 0;
 volatile bool object3 = 0;
