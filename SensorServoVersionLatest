@@ -5,7 +5,7 @@
 // If sensors detect object, on/off red. If object leaving, on/off blue.
 // For disabled, turn on green LED if car is there, else turn green off.
 //
-// If this way works, try it without timers outputting pulse trigger pulse, just the flags. 
+// It works, try it without timers outputting pulse trigger pulse, just the flags. 
 //
 // This drives servo motors 90 degrees to left on PWM PB6, PB7 when 
 // ultrasonic sensor senses object around 4.5cm away.
@@ -56,10 +56,10 @@ void PortFunctionInit(void)
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
 	// Enable pin PF3 for GPIOOutput (green) Trig
 	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_3|GPIO_PIN_1|GPIO_PIN_2);
-	// Enable pin PF2 for GPIOInput (blue) Echo
+	// Enable pin PF4 for GPIOInput SW1
 	GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 	//Enable pull-up on PF4 
-	//GPIO_PORTF_PUR_R |= 0x10; 
+	GPIO_PORTF_PUR_R |= 0x10; 
 	
 	// Enable clock for Port D peripheral
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
@@ -154,7 +154,7 @@ void Timers_Init()		//unsigned long reload
 	TimerDisable(TIMER0_BASE, TIMER_A);								// disable timer during setup
 	TimerConfigure(TIMER0_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
 	//TimerLoadSet(TIMER0_BASE, TIMER_A, reload-1);			// reload value of 60ms
-	IntPrioritySet(INT_TIMER0A, 0x20);								// Set priority as 1
+	IntPrioritySet(INT_TIMER0A, 0x00);								// Set priority as 1
 	TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
 	IntEnable(INT_TIMER0A);														// Enable interrupt 35 in NVIC
 	TimerEnable(TIMER0_BASE, TIMER_B);
@@ -165,7 +165,7 @@ void Timers_Init()		//unsigned long reload
 	//TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM);
 	TimerDisable(TIMER1_BASE, TIMER_A);								// disable timer during setup
 	TimerConfigure(TIMER1_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
-	IntPrioritySet(INT_TIMER1A, 0x20);								// Set priority as 1
+	IntPrioritySet(INT_TIMER1A, 0x00);								// Set priority as 1
 	TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
 	IntEnable(INT_TIMER1A);														// Enable interrupt  
 	TimerEnable(TIMER1_BASE, TIMER_B);								// Enable Timer1B
@@ -175,7 +175,7 @@ void Timers_Init()		//unsigned long reload
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);			// enable peripheral clock for Timer2A
 	TimerDisable(TIMER2_BASE, TIMER_A);								// disable timer during setup
 	TimerConfigure(TIMER2_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
-	IntPrioritySet(INT_TIMER2A, 0x20);								// Set priority as 1
+	IntPrioritySet(INT_TIMER2A, 0x00);								// Set priority as 1
 	TimerIntEnable(TIMER2_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
 	IntEnable(INT_TIMER2A);														// Enable interrupt 
 	TimerEnable(TIMER2_BASE, TIMER_B);								// Enable Timer2B
@@ -184,7 +184,7 @@ void Timers_Init()		//unsigned long reload
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER3);			// enable peripheral clock for Timer3A
 	TimerDisable(TIMER3_BASE, TIMER_A);								// disable timer during setup
 	TimerConfigure(TIMER3_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
-	IntPrioritySet(INT_TIMER3A, 0x20);								// Set priority as 1
+	IntPrioritySet(INT_TIMER3A, 0x00);								// Set priority as 1
 	TimerIntEnable(TIMER3_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
 	IntEnable(INT_TIMER3A);														// Enable interrupt 
 	TimerEnable(TIMER3_BASE, TIMER_B);								// Enable Timer3B
@@ -193,7 +193,7 @@ void Timers_Init()		//unsigned long reload
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER4);			// enable peripheral clock for Timer2A
 	TimerDisable(TIMER4_BASE, TIMER_A);								// disable timer during setup
 	TimerConfigure(TIMER4_BASE, TIMER_CFG_SPLIT_PAIR|TIMER_CFG_A_PERIODIC|TIMER_CFG_B_PERIODIC_UP);	// configure for periodic mode
-	IntPrioritySet(INT_TIMER4A, 0x20);								// Set priority as 1
+	IntPrioritySet(INT_TIMER4A, 0x00);								// Set priority as 1
 	TimerIntEnable(TIMER4_BASE, TIMER_TIMA_TIMEOUT);	// arm interrupt at timeout
 	IntEnable(INT_TIMER4A);														// Enable interrupt 
 	TimerEnable(TIMER4_BASE, TIMER_B);								// Enable Timer4B
@@ -203,10 +203,10 @@ void InterruptF_Init(void)
 {
 	IntEnable(INT_GPIOF);								                          // Enable interrupt 30 in NVIC, Code: NVIC_EN0_R |= 0x40000000;
 	IntPrioritySet(INT_GPIOF, 0x00);		                          // Set interrupt priority 0 bits 23-21:010, Code: NVIC_PRI7_R &= ~0x00E00000
-	GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_1|GPIO_INT_PIN_2|GPIO_PIN_3);		//GPIO_PORTF_IM_R |= 0x04; arm interrupt on PF2 (Echo)
+	GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_1|GPIO_INT_PIN_2|GPIO_INT_PIN_3|GPIO_INT_PIN_4);		//GPIO_PORTF_IM_R |= 0x04; arm interrupt on PF2 (Echo)
 	GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2, GPIO_RISING_EDGE);
 	GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_BOTH_EDGES);
-	//GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_FALLING_EDGE);
+	GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_FALLING_EDGE);
 	                                                              //GPIO_PORTF_IS_R &= ~0x04;	PF2 are edge sensitive
 	                                                              //GPIO_PORTF_IBE_R &= ~0x04;  PF2 not both edge triggered, depends on IEV register
 	                                                              //GPIO_PORTF_IEV_R |= 0x04;PF2 are rising-edged event
@@ -223,7 +223,7 @@ void InterruptA_Init(void)
 void InterruptD_Init(void)
 {
 	IntEnable(INT_GPIOD);								                          // Enable interrupt 30 in NVIC, Code: NVIC_EN0_R |= 0x40000000;
-	IntPrioritySet(INT_GPIOD, 0x00);		                          // Set interrupt priority 0 bits 23-21:010, Code: NVIC_PRI7_R &= ~0x00E00000
+	IntPrioritySet(INT_GPIOD, 0x20);		                          // Set interrupt priority 0 bits 23-21:010, Code: NVIC_PRI7_R &= ~0x00E00000
 	GPIOIntEnable(GPIO_PORTD_BASE, GPIO_INT_PIN_1|GPIO_INT_PIN_3);								// arm interrupt on PB1 (Echo)
 	GPIOIntTypeSet(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3, GPIO_BOTH_EDGES);
 }
@@ -296,7 +296,7 @@ void GPIOPortD_Handler(void)			// C interrupt to count cars
 			distance0 = duration0/464;//*17000/SysCtlClockGet(); 232 for 4Mhz
 			
 			// if car park not full and there's a car in front
-			if(((cars_count<4)||(Disabled_count < 2))&&(distance0 < 4))
+			if(((cars_count!=3)||(Disabled_count!=1))&&(distance0 < 4))
 			{
 				PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, 650);
 				SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);
@@ -399,21 +399,17 @@ void GPIOPortF_Handler(void)
 		//prev_count = cars_count;
 	}
 	
-//	if(GPIO_PORTF_RIS_R&0x10)
-//	{
-//		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_4);
-//		// If SW1 is pressed
-//		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_4)== 0)
-//		{
-//			PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, 625);
-//			SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);
-//		}
-//		// falling edge
-//		else
-//		{
-//			PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, 375);
-//		}
-//	}
+	if(GPIO_PORTF_RIS_R&0x10)
+	{
+		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_4);
+		// If SW1 is pressed
+		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_4)== 0)
+		{
+			PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, 650);
+			SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);
+			PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, 375);
+		}
+	}
 }
 
 // interrupt for counting cars leaving
@@ -633,7 +629,7 @@ int main(void)
 		// display full message when carpark is full. 
 		if((cars_count==3)&&(Disabled_count==1))
 		{
-			char message4[] = "Carpark FULL!";
+			char message4[] = "Carpark FULL!\n\r";
 			for (int k = 0; k<sizeof(message4); k++)
 			{
 				UARTCharPut(UART0_BASE, message4[k]);
