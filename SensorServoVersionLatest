@@ -65,7 +65,7 @@ void PortFunctionInit(void)
 	GPIOPinTypeGPIOOutput(GPIO_PORTD_BASE, GPIO_PIN_0|GPIO_PIN_2);
 	// Enable pin PD1,3,7 for GPIOInput  Echo
 	GPIOPinTypeGPIOInput(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3);
-	// Set output 2mA current strength, push-pull pin *STD, and weak pull down *WPD.
+	// Set output 2mA current strength, push-pull pin *STD, and weak pull down *WPD (high resistance to prevents leakage and guarantees 0V.
 	GPIOPadConfigSet(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
 	
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);            		// enable GPIO port B
