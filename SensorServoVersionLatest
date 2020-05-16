@@ -4,7 +4,8 @@
 //
 // If sensors detect object, on/off red. If object leaving, on/off blue.
 // For disabled, turn on green LED if car is there, else turn green off.
-//
+// Display message on Tera Term with UART
+// 
 //
 // This drives servo motors 90 degrees to left on PWM PB6, PB7 when 
 // ultrasonic sensor senses object around 4.5cm away.
@@ -52,7 +53,7 @@ void PortFunctionInit(void)
 {
 	// Enable clock for Port F peripheral
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
-	// Enable pin PF3 for GPIOOutput (green) Trig
+	// Enable pin PF1,2,3 for GPIOOutput (green) 
 	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_3|GPIO_PIN_1|GPIO_PIN_2);
 	// Enable pin PF4 for GPIOInput SW1
 	GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
@@ -61,11 +62,11 @@ void PortFunctionInit(void)
 	
 	// Enable clock for Port D peripheral
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
-	// Enable pin PD0,2,6 for GPIOOutput Trig
+	// Enable pin PD0,2 for GPIOOutput Trig
 	GPIOPinTypeGPIOOutput(GPIO_PORTD_BASE, GPIO_PIN_0|GPIO_PIN_2);
-	// Enable pin PD1,3,7 for GPIOInput  Echo
+	// Enable pin PD1,3 for GPIOInput  Echo
 	GPIOPinTypeGPIOInput(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3);
-	// Set output 2mA current strength, push-pull pin *STD, and weak pull down *WPD (high resistance to prevents leakage and guarantees 0V.
+	// Set output 2mA current strength, push-pull pin *STD, and weak pull down *WPD.
 	GPIOPadConfigSet(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
 	
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);            		// enable GPIO port B
@@ -141,65 +142,65 @@ void Timers_Init()		//unsigned long reload
 	//Timer0A count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);			// enable peripheral clock for Timer0A
 	TimerDisable(TIMER0_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER0_BASE, TIMER_CFG_A_PERIODIC_UP);	// configure for periodic up count mode													
-	TimerEnable(TIMER0_BASE, TIMER_A);
+	TimerConfigure(TIMER0_BASE, TIMER_CFG_A_ONE_SHOT_UP);	// configure for one shot up count mode													
+	TimerEnable(TIMER0_BASE, TIMER_A);								// Enable Timer0A
 	
 	// Timer1A count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);			// enable peripheral clock for Timer1A
 	TimerDisable(TIMER1_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER1_BASE, TIMER_CFG_A_PERIODIC_UP);	// configure for periodic up count mode 
-	TimerEnable(TIMER1_BASE, TIMER_A);								// Enable Timer1B
+	TimerConfigure(TIMER1_BASE, TIMER_CFG_A_ONE_SHOT_UP);	// configure for one shot up count mode 
+	TimerEnable(TIMER1_BASE, TIMER_A);								// Enable Timer1A
 
 	// Timer2A count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);			// enable peripheral clock for Timer2A
 	TimerDisable(TIMER2_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER2_BASE, TIMER_CFG_A_PERIODIC_UP);	// configure for periodic up count mode 
-	TimerEnable(TIMER2_BASE, TIMER_A);								// Enable Timer2B
+	TimerConfigure(TIMER2_BASE, TIMER_CFG_A_ONE_SHOT_UP);	// configure for one shot up count mode 
+	TimerEnable(TIMER2_BASE, TIMER_A);								// Enable Timer2A
 	
 	// Timer3A count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER3);			// enable peripheral clock for Timer3A
 	TimerDisable(TIMER3_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER3_BASE, TIMER_CFG_A_PERIODIC_UP);	// configure for periodic up count mode
+	TimerConfigure(TIMER3_BASE, TIMER_CFG_A_ONE_SHOT_UP);	// configure for one shot up count mode
 
-	TimerEnable(TIMER3_BASE, TIMER_A);								// Enable Timer3B
+	TimerEnable(TIMER3_BASE, TIMER_A);								// Enable Timer3A
 
 	// Timer4A count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER4);			// enable peripheral clock for Timer2A
 	TimerDisable(TIMER4_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER4_BASE, TIMER_CFG_A_PERIODIC_UP);	// configure for periodic up count mode
-	TimerEnable(TIMER4_BASE, TIMER_A);								// Enable Timer4B
+	TimerConfigure(TIMER4_BASE, TIMER_CFG_A_ONE_SHOT_UP);	// configure for one shot up count mode
+	TimerEnable(TIMER4_BASE, TIMER_A);								// Enable Timer4A
 }
 
 void InterruptF_Init(void)
 {
 	IntEnable(INT_GPIOF);								                          // Enable interrupt 30 in NVIC, Code: NVIC_EN0_R |= 0x40000000;
 	IntPrioritySet(INT_GPIOF, 0x00);		                          // Set interrupt priority 0 bits 23-21:010, Code: NVIC_PRI7_R &= ~0x00E00000
-	GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_1|GPIO_INT_PIN_2|GPIO_INT_PIN_3|GPIO_INT_PIN_4);		//GPIO_PORTF_IM_R |= 0x04; arm interrupt on PF2 (Echo)
-	GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2, GPIO_RISING_EDGE);
-	GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_BOTH_EDGES);
-	GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_FALLING_EDGE);
-	                                                              //GPIO_PORTF_IS_R &= ~0x04;	PF2 are edge sensitive
-	                                                              //GPIO_PORTF_IBE_R &= ~0x04;  PF2 not both edge triggered, depends on IEV register
-	                                                              //GPIO_PORTF_IEV_R |= 0x04;PF2 are rising-edged event
+	GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_1|GPIO_INT_PIN_2|GPIO_INT_PIN_3|GPIO_INT_PIN_4);//GPIO_PORTF_IM_R; arm interrupt on PF1-4 (Echo)
+	GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2, GPIO_RISING_EDGE);		// PF1 & 2 rising edged interrupt
+	GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_BOTH_EDGES);								// PF3 Both edged interrupt
+	GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_FALLING_EDGE);							// PF4 falling edged interrupt
+	//GPIO_PORTF_IS_R;	 edge sensitive
+	//GPIO_PORTF_IBE_R;  both edge triggered, depends on IEV register
+	//GPIO_PORTF_IEV_R; rising-edged/falling edged event
 }
 
 void InterruptA_Init(void)
 {
 	IntEnable(INT_GPIOA);								                          // Enable interrupt 
-	IntPrioritySet(INT_GPIOA, 0x20);		                          // Set interrupt priority 0 
-	GPIOIntEnable(GPIO_PORTA_BASE, GPIO_INT_PIN_3|GPIO_INT_PIN_5|GPIO_INT_PIN_7);		//arm interrupt on PC0,1,2 (Echo)
+	IntPrioritySet(INT_GPIOA, 0x20);		                          // Set interrupt priority 1 
+	GPIOIntEnable(GPIO_PORTA_BASE, GPIO_INT_PIN_3|GPIO_INT_PIN_5|GPIO_INT_PIN_7);		//arm interrupt on PA3,5,7 (Echo)
 	GPIOIntTypeSet(GPIO_PORTA_BASE, GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7, GPIO_BOTH_EDGES);		// interrupt on both edges
 }
 
 void InterruptD_Init(void)
 {
-	IntEnable(INT_GPIOD);								                          // Enable interrupt 30 in NVIC, Code: NVIC_EN0_R |= 0x40000000;
-	IntPrioritySet(INT_GPIOD, 0x20);		                          // Set interrupt priority 0 bits 23-21:010, Code: NVIC_PRI7_R &= ~0x00E00000
-	GPIOIntEnable(GPIO_PORTD_BASE, GPIO_INT_PIN_1|GPIO_INT_PIN_3);								// arm interrupt on PB1 (Echo)
-	GPIOIntTypeSet(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3, GPIO_BOTH_EDGES);
+	IntEnable(INT_GPIOD);								                          // Enable interrupt 
+	IntPrioritySet(INT_GPIOD, 0x20);		                          // Set interrupt priority 1 
+	GPIOIntEnable(GPIO_PORTD_BASE, GPIO_INT_PIN_1|GPIO_INT_PIN_3);								// arm interrupt on PD1,3 (Echo)
+	GPIOIntTypeSet(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_3, GPIO_BOTH_EDGES);			// interrupt on both edges
 }
 
-void GPIOPortD_Handler(void)			// C interrupt to count cars
+void GPIOPortD_Handler(void)			// D interrupt to count cars
 {
 	if(GPIO_PORTD_RIS_R&0x08)				// if PD3 has action
 	{
@@ -209,9 +210,9 @@ void GPIOPortD_Handler(void)			// C interrupt to count cars
 		// count while there's pulse from echo pin rising
 		if(GPIOPinRead(GPIO_PORTD_BASE, GPIO_PIN_3)== GPIO_PIN_3)
 		{
-			// Initialize Timer0B with value 0, HWREG(TIMER0_BASE + TIMER_O_TAV) = 0;
+			// Initialize Timer0A with value 0, HWREG(TIMER0_BASE + TIMER_O_TAV) = 0;
       TIMER0_TAV_R = 0xFFFFFFFF;
-      // Enable Timer0 to start measuring duration for which Echo Pin is High
+      // Enable Timer0A to start measuring duration for which Echo Pin is High
       TimerEnable(TIMER0_BASE, TIMER_A);
 		}
 		// falling edge
@@ -442,6 +443,32 @@ void GPIOPortA_Handler(void)
 	}
 }
 
+void printmessage(uint32_t cars_count, uint32_t Disabled_count)
+{
+	char cars = cars_count + '0';								// convert int to string with ASCII
+	char disabled = Disabled_count + '0';
+	char message2[] = "Regular Spot: ";
+	for (int k = 0; k<sizeof(message2); k++)
+	{
+		UARTCharPut(UART0_BASE, message2[k]);
+	}
+	
+	UARTCharPut(UART0_BASE, cars);
+	char message3[] = "/3 Disabled Spot: ";
+	for (int k = 0; k<sizeof(message3); k++)
+	{
+		UARTCharPut(UART0_BASE, message3[k]);
+	}
+
+	UARTCharPut(UART0_BASE, disabled);
+	
+	char message1[] = "/1    ";
+	for (int k = 0; k<sizeof(message1); k++)	
+	{
+		UARTCharPut(UART0_BASE, message1[k]);				
+	}
+}
+
 int main(void)
 {
 	// Set clock rate to 400M/2/25 = 8MHz. (or 40MHz, divide by 5)
@@ -532,6 +559,7 @@ int main(void)
 			trigok4 = 0;
 		}
 		
+		printmessage(cars_count, Disabled_count);
 		// display full message when carpark is full. 
 		if((cars_count==3)&&(Disabled_count==1))
 		{
@@ -541,32 +569,78 @@ int main(void)
 				UARTCharPut(UART0_BASE, message4[k]);
 			}
 		}
-		
-		else
+			
+		else 
 		{
-			char cars = cars_count + '0';								// convert int to string with ASCII
-			char disabled = Disabled_count + '0';
-			char message2[] = "Regular Spot: ";
-			for (int k = 0; k<sizeof(message2); k++)
+			if((object1)&&(object2!=1)&&(object3!=1))
 			{
-				UARTCharPut(UART0_BASE, message2[k]);
+				char message4[] = "2nd & 3rd regular spots open.\n\r";
+				for (int k = 0; k<sizeof(message4); k++)
+				{
+					UARTCharPut(UART0_BASE, message4[k]);
+				}
 			}
-			
-			UARTCharPut(UART0_BASE, cars);
-			char message3[] = "/3 Disabled Spot: ";
-			for (int k = 0; k<sizeof(message3); k++)
+			else if((object1!=1)&&(object2)&&(object3!=1))
 			{
-				UARTCharPut(UART0_BASE, message3[k]);
+				char message4[] = "1st & 3rd regular spots open.\n\r";
+				for (int k = 0; k<sizeof(message4); k++)
+				{
+					UARTCharPut(UART0_BASE, message4[k]);
+				}
 			}
-
-			UARTCharPut(UART0_BASE, disabled);
-			
-			char message1[] = "/1\n\r";
-			for (int k = 0; k<sizeof(message1); k++)
+			else if((object1!=1)&&(object2!=1)&&(object3))
 			{
-				UARTCharPut(UART0_BASE, message1[k]);				
+				char message4[] = "1st & 2nd regular spots open.\n\r";
+				for (int k = 0; k<sizeof(message4); k++)
+				{
+					UARTCharPut(UART0_BASE, message4[k]);
+				}
 			}
+			else if((object1)&&(object2)&&(object3!=1))
+			{
+				char message4[] = "3rd spot regular open.\n\r";
+				for (int k = 0; k<sizeof(message4); k++)
+				{
+					UARTCharPut(UART0_BASE, message4[k]);
+				}
+				
+			}
+			else if((object1)&&(object2!=1)&&(object3))
+			{
+				char message4[] = "2nd spot regular open.\n\r";
+				for (int k = 0; k<sizeof(message4); k++)
+				{
+					UARTCharPut(UART0_BASE, message4[k]);
+				}
+			}
+			else if((object1!=1)&&(object2)&&(object3))
+			{
+				char message4[] = "1st spot regular open.\n\r";
+				for (int k = 0; k<sizeof(message4); k++)
+				{
+					UARTCharPut(UART0_BASE, message4[k]);
+				}
+			}
+			else if((object1)&&(object2)&&(object3))
+			{
+				char message4[] = "No regular spots open.\n\r";
+				for (int k = 0; k<sizeof(message4); k++)
+				{
+					UARTCharPut(UART0_BASE, message4[k]);
+				}
+			}
+		
+			else
+			{
+				char message4[] = "All regular spots open.\n\r";
+				for (int k = 0; k<sizeof(message4); k++)
+				{
+					UARTCharPut(UART0_BASE, message4[k]);
+				}
+			}
+		//	SysCtlDelay(53333); //0.05 secs
 		}
+	
 //		while(prev_count != cars_count)
 //		{
 //			char cars = cars_count + '0';
