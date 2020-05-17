@@ -1,6 +1,6 @@
 //***********************************************************
-// Hardware PWM proof of concept using
-// the Tiva C Launchpad
+// The Smart Parking System via Tiva C series launchpad
+// 
 //
 // If sensors detect object, on/off red. If object leaving, on/off blue.
 // For disabled, turn on green LED if car is there, else turn green off.
@@ -9,7 +9,7 @@
 // by Ananda Aw, CanXian Su, YunJie Li
 //
 // This drives servo motors 90 degrees to left on PWM PB6, PB7 when 
-// ultrasonic sensor senses object around 4.5cm away.
+// ultrasonic sensor senses object around 4cm away.
 //***********************************************************
 
 #include <stdint.h>
