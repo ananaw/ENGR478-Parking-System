@@ -142,25 +142,25 @@ void Configure_Timers()		//unsigned long reload
 	//Timer0A count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);			// enable peripheral clock for Timer0A
 	TimerDisable(TIMER0_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER0_BASE, TIMER_CFG_A_ONE_SHOT_UP);	// configure for one shot up count mode													
+	TimerConfigure(TIMER0_BASE, TIMER_CFG_A_PERIODIC_UP);	// configure for one shot up count mode													
 	TimerEnable(TIMER0_BASE, TIMER_A);								// Enable Timer0A
 	
 	// Timer1A count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);			// enable peripheral clock for Timer1A
 	TimerDisable(TIMER1_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER1_BASE, TIMER_CFG_A_ONE_SHOT_UP);	// configure for one shot up count mode 
+	TimerConfigure(TIMER1_BASE, TIMER_CFG_A_PERIODIC_UP);	// configure for one shot up count mode 
 	TimerEnable(TIMER1_BASE, TIMER_A);								// Enable Timer1A
 
 	// Timer2A count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);			// enable peripheral clock for Timer2A
 	TimerDisable(TIMER2_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER2_BASE, TIMER_CFG_A_ONE_SHOT_UP);	// configure for one shot up count mode 
+	TimerConfigure(TIMER2_BASE, TIMER_CFG_A_PERIODIC_UP);	// configure for one shot up count mode 
 	TimerEnable(TIMER2_BASE, TIMER_A);								// Enable Timer2A
 	
 	// Timer3A count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER3);			// enable peripheral clock for Timer3A
 	TimerDisable(TIMER3_BASE, TIMER_A);								// disable timer during setup
-	TimerConfigure(TIMER3_BASE, TIMER_CFG_A_ONE_SHOT_UP);	// configure for one shot up count mode
+	TimerConfigure(TIMER3_BASE, TIMER_CFG_A_PERIODIC_UP);	// configure for one shot up count mode
 
 	TimerEnable(TIMER3_BASE, TIMER_A);								// Enable Timer3A
 
