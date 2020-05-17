@@ -137,7 +137,7 @@ ConfigurePWM(uint32_t period, uint32_t duty)
     PWMOutputState(PWM0_BASE, PWM_OUT_4_BIT|PWM_OUT_5_BIT, true);		
 }
 
-void Timers_Init()		//unsigned long reload
+void Configure_Timers()		//unsigned long reload
 {
 	//Timer0A count
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);			// enable peripheral clock for Timer0A
@@ -202,12 +202,43 @@ void InterruptD_Init(void)
 
 void GPIOPortD_Handler(void)			// D interrupt to count cars
 {
+	// Disabled spot case
+	if(GPIO_PORTD_RIS_R&0x02)																	// if PD1 has action 
+	{	
+		GPIOIntClear(GPIO_PORTD_BASE, GPIO_INT_PIN_1);					// Clear trigger flag echo pin
+	
+		// start count at rising edged
+		if(GPIOPinRead(GPIO_PORTD_BASE, GPIO_PIN_1)== GPIO_PIN_1)		// if PD1 high
+		{
+        TIMER4_TAV_R = 0xFFFFFFFF;			// Initialize Timer4A with value 0, HWREG(TIMER4_BASE + TIMER_O_TAV) = 0;
+        TimerEnable(TIMER4_BASE, TIMER_A);									// Enable Timer4 to start counting for when Echo Pin is High
+		}
+		// falling edge
+		else
+		{
+			TimerDisable(TIMER4_BASE, TIMER_A);										// disable timer
+			duration4 = TimerValueGet(TIMER4_BASE, TIMER_A);			// get value of timer
+			distance4 = duration4/464;														//convert to distance in cm, *17000/SysCtlClockGet(); 
+			
+			// if car is at parking spot, distance less than 4cm
+			if(distance4 < 4)
+			{
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);		// turn green LED on 
+			}
+			else
+			{
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);							// turn green LED off
+			}
+      trigok4 = 1;						// Set condition for Trigger Pulse
+		}
+	}
+	
 	if(GPIO_PORTD_RIS_R&0x08)				// if PD3 has action
 	{
-		// Clear trigger flag echo pin
+		// Clear flag echo pin PF3
 		GPIOIntClear(GPIO_PORTD_BASE, GPIO_INT_PIN_3);
 	
-		// count while there's pulse from echo pin rising
+		// count at rising edged
 		if(GPIOPinRead(GPIO_PORTD_BASE, GPIO_PIN_3)== GPIO_PIN_3)
 		{
 			// Initialize Timer0A with value 0, HWREG(TIMER0_BASE + TIMER_O_TAV) = 0;
@@ -220,61 +251,150 @@ void GPIOPortD_Handler(void)			// D interrupt to count cars
 		{
 			TimerDisable(TIMER0_BASE, TIMER_A);
 			duration0 = TimerValueGet(TIMER0_BASE, TIMER_A);
-			distance0 = duration0/464;//*17000/SysCtlClockGet(); 232 for 4Mhz
+			distance0 = duration0/464;			//*17000/SysCtlClockGet();
 			
 			// if car park not full and there's a car in front
 			if(((cars_count!=3)||(Disabled_count!=1))&&(distance0 < 4))
 			{
-				PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, 650);
-				SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);
+				PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, 650);				// Turn 90 deg to left
+				SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);					// delay 2s
 			}	
 			else
 			{
-				PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, 375);
+				PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, 375);				// Turn back to 0 deg
 			}
 			
-			// Enable condition for Trigger Pulse
+			// Set condition for Trigger Pulse
       trigok0 = 1;
 		}
 	}
-	
-	// Disabled spot case
-	if(GPIO_PORTD_RIS_R&0x02)																	// if PD1 has action 
+}
+
+// interrupt for counting cars leaving
+void GPIOPortA_Handler(void)
+{
+	if(GPIO_PORTA_RIS_R&0x08)																	// if PA3 has action 
 	{	
-		GPIOIntClear(GPIO_PORTD_BASE, GPIO_INT_PIN_1);					// Clear trigger flag echo pin
+		GPIOIntClear(GPIO_PORTA_BASE, GPIO_INT_PIN_3);					// Clear flag echo pin PA3
 	
 		// count while there's pulse from echo pin rising
-		if(GPIOPinRead(GPIO_PORTD_BASE, GPIO_PIN_1)== GPIO_PIN_1)		// if PD1 high
+		if(GPIOPinRead(GPIO_PORTA_BASE, GPIO_PIN_3)== GPIO_PIN_3)		// if PA3 high
 		{
-        TIMER4_TAV_R = 0xFFFFFFFF;			// Initialize Timer4B with value 0, HWREG(TIMER4_BASE + TIMER_O_TAV) = 0;
-        TimerEnable(TIMER4_BASE, TIMER_A);									// Enable Timer1 to start measuring duration for which Echo Pin is High
+        TIMER1_TAV_R = 0xFFFFFFFF; 													// Initialize Timer1A with value 0, HWREG(TIMER1_BASE + TIMER_O_TAV) = 0;
+        TimerEnable(TIMER1_BASE, TIMER_A);									// Enable Timer1A to start counting for which Echo Pin is High
 		}
 		// falling edge
 		else
 		{
-			TimerDisable(TIMER4_BASE, TIMER_A);										// disable timer
-			duration4 = TimerValueGet(TIMER4_BASE, TIMER_A);			// get value of timer
-			distance4 = duration4/464;														//*17000/SysCtlClockGet();convert to distance
+			duration1 = TimerValueGet(TIMER1_BASE, TIMER_A);			// get value of timer
+			TimerDisable(TIMER1_BASE, TIMER_A);										// disable timer
+			distance1 = duration1/464;														// convert to distance in cm, *17000/SysCtlClockGet();	
 			
-			if(distance4 < 4)
+			// if there's no car and distance less than 4cm
+			if((object1!=1)&&(distance1 < 4))
 			{
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);		// turn green LED on 
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);		// turn on red LED
+				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);						// delay 0.375s
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);							// turn off red LED
+				object1 = 1;																							// set flag to indicate a car is present
 			}
-			else
+			
+			// if car present and distance > 10cm 
+			if((object1)&&(distance1>10))
 			{
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);		// turn on blue LED
+				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);						// delay 0.375s
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);							// turn off blue LED
+				object1 = 0;																							// clear flag to indicate a car is not present
 			}
-      trigok4 = 1;						// Enable condition for Trigger Pulse
+      trigok1 = 1;						// Set condition for Trigger Pulse
+		}
+	}
+	
+	if(GPIO_PORTA_RIS_R&0x20)																	// if PA5 has action 
+	{	
+		GPIOIntClear(GPIO_PORTA_BASE, GPIO_INT_PIN_5);					// Clear trigger flag echo pin
+	
+		// count while there's pulse from echo pin rising
+		if(GPIOPinRead(GPIO_PORTA_BASE, GPIO_PIN_5)== GPIO_PIN_5)		// if PA5 high
+		{
+        TIMER2_TAV_R = 0xFFFFFFFF;													// Initialize Timer2A with value 0, HWREG(TIMER2_BASE + TIMER_O_TAV) = 0;
+        TimerEnable(TIMER2_BASE, TIMER_A);									// Enable Timer2A to start counting for which Echo Pin is High
+		}
+		// falling edge
+		else
+		{
+			TimerDisable(TIMER2_BASE, TIMER_A);										// stop timer								
+			duration2 = TimerValueGet(TIMER2_BASE, TIMER_A);			// get timer value
+			distance2 = duration2/464;														// convert to distance in cm, *17000/SysCtlClockGet();
+			
+			// if car not present and distance less than 4cm
+			if((object2!=1)&&(distance2<4))	
+			{
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);		// turn on red LED
+				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);						// delay 0.375s
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);							// turn off red LED
+				object2 = 1;																							// Set flag to indicate car is present
+			}
+			
+			// if car present and distance > 10cm
+			if((object2)&&(distance2>10))
+			{
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);		// turn on blue LED
+				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);						// delay 0.375s
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);							// turn off blue LED
+				object2 = 0;																							// Clear flag to indicate car is not present
+			}
+      trigok2 = 1;						// Set condition for Trigger Pulse
+		}
+	}
+	
+	
+	if(GPIO_PORTA_RIS_R&0x80)																	// if PA7 has action 
+	{	
+		GPIOIntClear(GPIO_PORTA_BASE, GPIO_INT_PIN_7);					// Clear trigger flag echo pin
+	
+		// count while there's pulse from echo pin rising
+		if(GPIOPinRead(GPIO_PORTA_BASE, GPIO_PIN_7)== GPIO_PIN_7)		// if PA7 high
+		{
+        TIMER3_TAV_R = 0xFFFFFFFF;													// Reset Timer3A with value 0, HWREG(TIMER3_BASE + TIMER_O_TAV) = 0;
+        TimerEnable(TIMER3_BASE, TIMER_A);									// Enable Timer3A to start counting for which Echo Pin is High
+		}
+		// falling edge
+		else
+		{
+			TimerDisable(TIMER3_BASE, TIMER_A);										// stop timer
+			duration3 = TimerValueGet(TIMER3_BASE, TIMER_A);			// Get timer value
+			distance3 = duration3/464;														// convert to distance in cm, *17000/SysCtlClockGet();
+			
+			// if car not present and distance < 4cm
+			if((object3!=1)&&(distance3 < 4))
+			{
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);		// turn on red LED
+				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);						// delay 0.375s
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);							// turn off red LED
+				object3 = 1;																							// Set flag to indicate car is present
+			}
+			
+			// if car present and distance > 10cm (car leaving)
+			if((object3)&&(distance3>10))						
+			{
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);		// turn on blue LED
+				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);						// delay 0.375s
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);							// turn off blue LED
+				object3 = 0;																							// clear flag to indicate car is not present
+			}
+      trigok3 = 1;						// Set condition for Trigger Pulse
 		}
 	}
 }
 
 void GPIOPortF_Handler(void)
 {
-	// If red LED on (increment)
+	// If red LED on 
 	if(GPIO_PORTF_RIS_R&0x02)
 	{
-		// clear trigger flag for PF1
+		// clear flag for PF1
 		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_1);
 		
 		// increment at rising edge
@@ -282,26 +402,24 @@ void GPIOPortF_Handler(void)
 		{
 			cars_count++;
 		}		
-	//	prev_count = cars_count;
 	}
 	
-	// if blue LED on (decrement)
+	// Check RIS flag, if blue LED on 
 	if(GPIO_PORTF_RIS_R&0x04)
 	{
-		// clear trigger flag for PF2
+		// clear flag for PF2
 		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_2);
 		
-		// increment at rising edge
+		// decrement at rising edge
 		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_2)==GPIO_PIN_2)
 		{
 			cars_count--;
 		}
-		//prev_count = cars_count;
 	}
 	
 	if(GPIO_PORTF_RIS_R&0x08)
 	{
-		// clear trigger flag for PF3
+		// clear flag for PF3
 		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_3);
 		// increment at rising edge
 		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_3)==GPIO_PIN_3)
@@ -313,136 +431,23 @@ void GPIOPortF_Handler(void)
 		{
 			Disabled_count--;
 		}
-		//prev_count = cars_count;
 	}
 	
 	if(GPIO_PORTF_RIS_R&0x10)
 	{
+		// Clear flag for PF4
 		GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_4);
 		// If SW1 is pressed
 		if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_4)== 0)
 		{
-			PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, 650);
-			SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);
-			PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, 375);
+			PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, 650);			// Turn servo 90 deg left
+			SysCtlDelay((2*SysCtlClockGet()-2)/3 + 1);				// Delay 2s
+			PWMPulseWidthSet(PWM0_BASE, PWM_OUT_5, 375);			// Turn servo back to 0 deg
 		}
 	}
 }
 
-// interrupt for counting cars leaving
-void GPIOPortA_Handler(void)
-{
-	if(GPIO_PORTA_RIS_R&0x08)																	// if PA3 has action 
-	{	
-		GPIOIntClear(GPIO_PORTA_BASE, GPIO_INT_PIN_3);					// Clear trigger flag echo pin
-	
-		// count while there's pulse from echo pin rising
-		if(GPIOPinRead(GPIO_PORTA_BASE, GPIO_PIN_3)== GPIO_PIN_3)		// if PA3 high
-		{
-        TIMER1_TAV_R = 0xFFFFFFFF; 													// Initialize Timer1B with value 0, HWREG(TIMER1_BASE + TIMER_O_TAV) = 0;
-        TimerEnable(TIMER1_BASE, TIMER_A);									// Enable Timer1 to start measuring duration for which Echo Pin is High
-		}
-		// falling edge
-		else
-		{
-			duration1 = TimerValueGet(TIMER1_BASE, TIMER_A);						// get value of timer
-			TimerDisable(TIMER1_BASE, TIMER_A);													// disable timer
-			distance1 = duration1/464;//*17000/SysCtlClockGet();								// convert to distance
-			
-			if((object1!=1)&&(distance1 < 4))
-			{
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);		// turn on red LED
-				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
-				
-				object1 = 1;
-			}
-			if((object1)&&(distance1>10))
-			{
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);		// turn on blue LED
-				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
-				object1 = 0;
-			}
-      trigok1 = 1;						// Enable condition for Trigger Pulse
-		}
-	}
-	
-	if(GPIO_PORTA_RIS_R&0x20)																	// if PA5 has action 
-	{	
-		GPIOIntClear(GPIO_PORTA_BASE, GPIO_INT_PIN_5);					// Clear trigger flag echo pin
-	
-		// count while there's pulse from echo pin rising
-		if(GPIOPinRead(GPIO_PORTA_BASE, GPIO_PIN_5)== GPIO_PIN_5)		// if PB3 high
-		{
-        TIMER2_TAV_R = 0xFFFFFFFF;													// Initialize Timer2B with value 0, HWREG(TIMER2_BASE + TIMER_O_TAV) = 0;
-        TimerEnable(TIMER2_BASE, TIMER_A);									// Enable Timer2 to start measuring duration for which Echo Pin is High
-		}
-		// falling edge
-		else
-		{
-			duration2 = TimerValueGet(TIMER2_BASE, TIMER_A);
-			TimerDisable(TIMER2_BASE, TIMER_A);
-			distance2 = duration2/464;//*17000/SysCtlClockGet();
-			
-			if((object2!=1)&&(distance2<4))
-			{
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);		// turn on red LED
-				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
-				object2 = 1;
-			}
-			if((object2)&&(distance2>10))
-			{
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);		// turn on blue LED
-				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
-				object2 = 0;
-			}
-      trigok2 = 1;						// Enable condition for Trigger Pulse
-		}
-	}
-	
-	
-	if(GPIO_PORTA_RIS_R&0x80)																	// if PA7 has action 
-	{	
-		GPIOIntClear(GPIO_PORTA_BASE, GPIO_INT_PIN_7);					// Clear trigger flag echo pin
-	
-		// count while there's pulse from echo pin rising
-		if(GPIOPinRead(GPIO_PORTA_BASE, GPIO_PIN_7)== GPIO_PIN_7)		// if PB7 high
-		{
-        TIMER3_TAV_R = 0xFFFFFFFF;													// Reset Timer3A with value 0, HWREG(TIMER3_BASE + TIMER_O_TAV) = 0;
-        TimerEnable(TIMER3_BASE, TIMER_A);									// Enable Timer4 to start measuring duration for which Echo Pin is High
-		}
-		// falling edge
-		else
-		{
-			duration3 = TimerValueGet(TIMER3_BASE, TIMER_A);
-			TimerDisable(TIMER3_BASE, TIMER_A);
-			distance3 = duration3/464;//*17000/SysCtlClockGet();
-			
-			if((object3!=1)&&(distance3 < 4))
-			{
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);		// turn on red LED
-				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
-				
-				object3 = 1;
-			}
-			
-			// if object leaving
-			if((object3)&&(distance3>10))						
-			{
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);		// turn on blue LED
-				SysCtlDelay((0.375*SysCtlClockGet()-2)/3 + 1);
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
-				object3 = 0;
-			}
-      trigok3 = 1;						// Enable condition for Trigger Pulse
-		}
-	}
-}
-
+// print message for the number of cars
 void printmessage(uint32_t cars_count, uint32_t Disabled_count)
 {
 	char cars = cars_count + '0';								// convert int to string with ASCII
@@ -477,16 +482,16 @@ int main(void)
 	uint32_t period = 5000; 						//20ms (8MHz / 32pwm_divider / 50Hz)
 	uint32_t duty = 375;     						//1.5ms pulse width (0 degrees), 0(1.5ms) mid, +90(~2.4ms) left, -90(0.5ms) right	
 	
-	// Initialize GPIOportF, PF2, PF3; GPIOportB (PB0,2,4,6 out, PB1,3,5,7 in); GPIOportC (PC4,5,6 output)
+	// Initialize GPIOportF, D, B, & A
 	PortFunctionInit();
 	
-	// Configure PB6,PB7 as PWM										
+	// Configure PE4,PE5 as PWM										
 	ConfigurePWM(period, duty);
 	
-	// Run Timer interrupt
-	Timers_Init();
+	// Configure timers0-3A
+	Configure_Timers();
 	
-	// Run PortB interrupt
+	// Run PortD interrupt
 	InterruptD_Init();	
 	
 	// Run PortF interrupt
@@ -497,8 +502,6 @@ int main(void)
 	
 	// Globally enable interrupt
 	IntMasterEnable();
-	
-	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 0);
 	
 //	char message0[] = "Welcome to Pi Parking Garage! All spots are empty!\n\r";
 //				for (int n = 0; n<sizeof(message0); n++)
@@ -560,6 +563,7 @@ int main(void)
 		}
 		
 		printmessage(cars_count, Disabled_count);
+		
 		// display full message when carpark is full. 
 		if((cars_count==3)&&(Disabled_count==1))
 		{
@@ -572,6 +576,7 @@ int main(void)
 			
 		else 
 		{
+			// if 1st regular spot taken only
 			if((object1)&&(object2!=1)&&(object3!=1))
 			{
 				char message4[] = "2nd & 3rd regular spots open.\n\r";
@@ -580,6 +585,7 @@ int main(void)
 					UARTCharPut(UART0_BASE, message4[k]);
 				}
 			}
+			// if 2nd regular spot taken only
 			else if((object1!=1)&&(object2)&&(object3!=1))
 			{
 				char message4[] = "1st & 3rd regular spots open.\n\r";
@@ -588,6 +594,7 @@ int main(void)
 					UARTCharPut(UART0_BASE, message4[k]);
 				}
 			}
+			// if 3rd regular spot taken only
 			else if((object1!=1)&&(object2!=1)&&(object3))
 			{
 				char message4[] = "1st & 2nd regular spots open.\n\r";
@@ -596,6 +603,7 @@ int main(void)
 					UARTCharPut(UART0_BASE, message4[k]);
 				}
 			}
+			// if 1st & 2nd regular spots taken
 			else if((object1)&&(object2)&&(object3!=1))
 			{
 				char message4[] = "3rd spot regular open.\n\r";
@@ -605,6 +613,7 @@ int main(void)
 				}
 				
 			}
+			// if 1st & 3rd regular spots taken
 			else if((object1)&&(object2!=1)&&(object3))
 			{
 				char message4[] = "2nd spot regular open.\n\r";
@@ -613,6 +622,7 @@ int main(void)
 					UARTCharPut(UART0_BASE, message4[k]);
 				}
 			}
+			// if 2nd & 3rd regular spots taken
 			else if((object1!=1)&&(object2)&&(object3))
 			{
 				char message4[] = "1st spot regular open.\n\r";
@@ -621,6 +631,7 @@ int main(void)
 					UARTCharPut(UART0_BASE, message4[k]);
 				}
 			}
+			// if all regular spots taken
 			else if((object1)&&(object2)&&(object3))
 			{
 				char message4[] = "No regular spots open.\n\r";
@@ -629,7 +640,7 @@ int main(void)
 					UARTCharPut(UART0_BASE, message4[k]);
 				}
 			}
-		
+			// if no regular spots taken
 			else
 			{
 				char message4[] = "All regular spots open.\n\r";
@@ -638,7 +649,6 @@ int main(void)
 					UARTCharPut(UART0_BASE, message4[k]);
 				}
 			}
-		//	SysCtlDelay(53333); //0.05 secs
 		}
 	
 //		while(prev_count != cars_count)
