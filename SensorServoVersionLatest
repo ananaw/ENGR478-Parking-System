@@ -6,6 +6,7 @@
 // For disabled, turn on green LED if car is there, else turn green off.
 // Display message on Tera Term with UART
 // 
+// by Ananda Aw, CanXian Su, YunJie Li
 //
 // This drives servo motors 90 degrees to left on PWM PB6, PB7 when 
 // ultrasonic sensor senses object around 4.5cm away.
