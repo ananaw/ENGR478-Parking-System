@@ -72,8 +72,10 @@ __heap_limit
 ;******************************************************************************
         AREA    RESET, CODE, READONLY
         THUMB
-        EXTERN GPIOPortF_Handler
-        EXTERN Timer0A_Handler
+
+		EXTERN GPIOPortF_Handler
+		EXTERN GPIOPortD_Handler  
+		EXTERN GPIOPortA_Handler
 ;******************************************************************************
 ;
 ; The vector table.
@@ -97,10 +99,10 @@ __Vectors
         DCD     0                           ; Reserved
         DCD     IntDefaultHandler           ; The PendSV handler
         DCD     IntDefaultHandler           ; The SysTick handler
-        DCD     IntDefaultHandler           ; GPIO Port A
+        DCD     GPIOPortA_Handler           ; GPIO Port A
         DCD     IntDefaultHandler           ; GPIO Port B
         DCD     IntDefaultHandler           ; GPIO Port C
-        DCD     IntDefaultHandler           ; GPIO Port D
+        DCD     GPIOPortD_Handler           ; GPIO Port D
         DCD     IntDefaultHandler           ; GPIO Port E
         DCD     IntDefaultHandler           ; UART0 Rx and Tx
         DCD     IntDefaultHandler           ; UART1 Rx and Tx
@@ -116,11 +118,11 @@ __Vectors
         DCD     IntDefaultHandler           ; ADC Sequence 2
         DCD     IntDefaultHandler           ; ADC Sequence 3
         DCD     IntDefaultHandler           ; Watchdog timer
-        DCD     Timer0A_Handler             ; Timer 0 subtimer A
+        DCD     IntDefaultHandler           	; Timer 0 subtimer A
         DCD     IntDefaultHandler           ; Timer 0 subtimer B
         DCD     IntDefaultHandler           ; Timer 1 subtimer A
         DCD     IntDefaultHandler           ; Timer 1 subtimer B
-        DCD     IntDefaultHandler           ; Timer 2 subtimer A
+        DCD     IntDefaultHandler            ; Timer 2 subtimer A
         DCD     IntDefaultHandler           ; Timer 2 subtimer B
         DCD     IntDefaultHandler           ; Analog Comparator 0
         DCD     IntDefaultHandler           ; Analog Comparator 1
@@ -132,7 +134,7 @@ __Vectors
         DCD     IntDefaultHandler           ; GPIO Port H
         DCD     IntDefaultHandler           ; UART2 Rx and Tx
         DCD     IntDefaultHandler           ; SSI1 Rx and Tx
-        DCD     IntDefaultHandler           ; Timer 3 subtimer A
+        DCD     IntDefaultHandler            ; Timer 3 subtimer A
         DCD     IntDefaultHandler           ; Timer 3 subtimer B
         DCD     IntDefaultHandler           ; I2C1 Master and Slave
         DCD     IntDefaultHandler           ; Quadrature Encoder 1
@@ -167,7 +169,7 @@ __Vectors
         DCD     0                           ; Reserved
         DCD     IntDefaultHandler           ; I2C2 Master and Slave
         DCD     IntDefaultHandler           ; I2C3 Master and Slave
-        DCD     IntDefaultHandler           ; Timer 4 subtimer A
+        DCD     IntDefaultHandler            ; Timer 4 subtimer A
         DCD     IntDefaultHandler           ; Timer 4 subtimer B
         DCD     0                           ; Reserved
         DCD     0                           ; Reserved
