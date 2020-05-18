@@ -8,3 +8,7 @@
 
 // Physical layout
 ![IMG_3159](https://user-images.githubusercontent.com/61036678/82163584-06b50e00-9861-11ea-9eb5-e8980a33a1c2.jpg)
+
+// ruler measurement
+![Ruler Measurement](https://user-images.githubusercontent.com/61036678/82163952-ee45f300-9862-11ea-8f3c-c70cb9634b78.jpg)
+
